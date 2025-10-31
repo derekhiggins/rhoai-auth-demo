@@ -1,1 +1,6 @@
+# Environment files with secrets
 vars.env
+
+# Virtual environments
+venv/
+
