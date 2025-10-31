@@ -33,7 +33,7 @@ fi
 echo "📦 Creating ConfigMap from config/run.yaml..."
 F=$(mktemp)
 cat config/run.yaml | envsubst > $F
-oc create configmap "${LLAMASTACK_DISTRIBUTION_NAME:-llamastack-auth-demo}-config" --from-file=run.yaml=$F -n "$NAMESPACE" --dry-run=client -o yaml | oc apply -f -
+oc create configmap "${LLAMASTACK_DISTRIBUTION_NAME:-llamastack-auth-demo}-config" --from-file=run.yaml=$F -n "$OPENSHIFT_NAMESPACE" --dry-run=client -o yaml | oc apply -f -
 rm $F
 
 # Deploy LlamaStack Distribution
@@ -46,7 +46,7 @@ envsubst < config/route.yaml | oc apply -f -
 
 # Wait for deployment to be ready
 echo "⏳ Waiting for LlamaStack to be ready..."
-oc wait --for=jsonpath='{.status.phase}'=Ready llamastackdistribution/"${LLAMASTACK_DISTRIBUTION_NAME:-llamastack-auth-demo}" -n "$NAMESPACE" --timeout=300s
+oc wait --for=jsonpath='{.status.phase}'=Ready llamastackdistribution/"${LLAMASTACK_DISTRIBUTION_NAME:-llamastack-auth-demo}" -n "$OPENSHIFT_NAMESPACE" --timeout=300s
 
 # Get the route URL
 ROUTE_URL=$(oc get route "${LLAMASTACK_DISTRIBUTION_NAME:-llamastack-auth-demo}" -o jsonpath='{.spec.host}' 2>/dev/null || echo "")
