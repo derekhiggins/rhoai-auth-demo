@@ -38,6 +38,13 @@ The demo features three user personas with different access levels:
    ```
 
 4. **Run the Demo**:
+
+   Interactive demo (single user):
+   ```bash
+   python scripts/interactive-demo.py
+   ```
+
+   Full automated demo (all users):
    ```bash
    python scripts/auth-demo.py
    ```
