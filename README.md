@@ -1,0 +1,48 @@
+# RHOAI LlamaStack Keycloak Authentication Demo
+
+This demo showcases role-based access control for LlamaStack using Keycloak authentication on Red Hat OpenShift AI (RHOAI).
+
+## Overview
+
+The demo features three user personas with different access levels:
+- **Admin**: Full access to all models (vLLM + OpenAI)
+- **Data Science**: Access to all inference models
+- **Other**: Basic inference access (vLLM only)
+
+## Prerequisites
+
+- OpenShift cluster with RHOAI installed
+- LlamaStack operator deployed
+- Keycloak instance running and accessible
+- `oc` CLI tool configured and authenticated
+
+## Quick Start
+
+1. **Setup Environment**:
+   ```bash
+   cp vars.env.example vars.env
+   vi vars.env  # Add your OpenAI API key and other settings
+   source ./vars.env
+   ```
+
+2. **Configure Keycloak**:
+   ```bash
+   python scripts/setup-keycloak.py
+   ```
+
+3. **Get Client Secret**:
+   ```bash
+   ./scripts/get-client-secret.sh
+   vi vars.env  # Copy the client secret to your vars.env file
+   ```
+
+5. **Deploy LlamaStack**:
+   ```bash
+   source vars.env  # Load environment variables
+   ./scripts/deploy.sh
+   ```
+
+6. **Run the Demo**:
+   ```bash
+   python scripts/auth-demo.py
+   ```

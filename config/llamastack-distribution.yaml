@@ -1,0 +1,44 @@
+apiVersion: llamastack.io/v1alpha1
+kind: LlamaStackDistribution
+metadata:
+  name: ${LLAMASTACK_DISTRIBUTION_NAME}
+  namespace: ${OPENSHIFT_NAMESPACE}
+spec:
+  replicas: 1
+  server:
+    distribution:
+      name: rh-dev
+    containerSpec:
+      name: llama-stack
+      port: 8321
+      env:
+        # vLLM Provider Configuration
+        - name: VLLM_URL
+          value: "${VLLM_URL}"
+        - name: VLLM_API_TOKEN
+          value: "${VLLM_API_TOKEN}"
+        - name: VLLM_TLS_VERIFY
+          value: "${VLLM_TLS_VERIFY}"
+        - name: VLLM_MAX_TOKENS
+          value: "${VLLM_MAX_TOKENS}"
+
+        # OpenAI Provider Configuration
+        - name: OPENAI_API_KEY
+          value: "${OPENAI_API_KEY}"
+        - name: OPENAI_BASE_URL
+          value: "${OPENAI_BASE_URL}"
+
+        # Keycloak Configuration
+        - name: KEYCLOAK_VERIFY_TLS
+          value: "${KEYCLOAK_VERIFY_TLS}"
+        
+        # Telemetry Configuration
+        - name: OTEL_SERVICE_NAME
+          value: "${OTEL_SERVICE_NAME}"
+        - name: TELEMETRY_SINKS
+          value: "${TELEMETRY_SINKS}"
+
+    # Reference the ConfigMap with OAuth configuration
+    userConfig:
+      configMapName: ${LLAMASTACK_DISTRIBUTION_NAME}-config
+      configMapNamespace: ${OPENSHIFT_NAMESPACE}

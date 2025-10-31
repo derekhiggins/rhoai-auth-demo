@@ -1,0 +1,18 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ${LLAMASTACK_DISTRIBUTION_NAME}
+  namespace: ${OPENSHIFT_NAMESPACE}
+  labels:
+    app: ${LLAMASTACK_DISTRIBUTION_NAME}
+spec:
+  to:
+    kind: Service
+    name: ${LLAMASTACK_DISTRIBUTION_NAME}-service
+    weight: 100
+  port:
+    targetPort: 8321
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
