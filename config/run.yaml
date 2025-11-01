@@ -9,7 +9,6 @@ apis:
 - scoring
 - telemetry
 - tool_runtime
-- vector_io
 - files
 providers:
   inference:
@@ -275,22 +274,4 @@ server:
           resource: model::openai/gpt-4o
         when: user with admin in roles
         description: Allow only admin users to access GPT-4o model
-      # Policy 4: Allow admin full access to agents API
-      - permit:
-          actions: [create, read, update, delete]
-          resource: agent::*
-        when: user with admin in roles
-        description: Allow admin users full access to agents
-      # Policy 5: Allow datascience limited access to agents API
-      - permit:
-          actions: [create, read]
-          resource: agent::*
-        when: user with datascience in roles
-        description: Allow datascience users to create and read agents
-      # Policy 6: Allow basic users read-only access to agents
-      - permit:
-          actions: [read]
-          resource: agent::*
-        when: user with basic in roles
-        description: Allow basic users read-only access to agents
 

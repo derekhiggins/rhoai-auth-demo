@@ -161,7 +161,7 @@ class KeycloakSetup:
         
         roles = [
             {"name": "admin", "description": "Full access to all models and operations"},
-            {"name": "datascience", "description": "Access to all inference models"},
+            {"name": "datascience", "description": "Access to vllm and GPT-4o-mini"},
             {"name": "basic", "description": "Basic inference access to vLLM models only"}
         ]
         

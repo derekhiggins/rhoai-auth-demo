@@ -120,6 +120,8 @@ class InteractiveLlamaStackDemo:
                     models = response_data.get('data', response_data.get('models', []))
                 
                 if isinstance(models, list) and models:
+                    print("   Available models:")
+                    embedding_models = []
                     for model in models:
                         if isinstance(model, dict):
                             # Try different possible field names
@@ -134,11 +136,25 @@ class InteractiveLlamaStackDemo:
                                 full_id = model_id
                             
                             print(f"   ? {full_id} ({model_type})")
+                            
+                            # Track embedding models for later use
+                            if model_type == 'embedding':
+                                embedding_models.append(model_id)
                         else:
                             print(f"   ? {model}")
+                    
+                    # Show embedding models specifically
+                    if embedding_models:
+                        print(f"\n   Available embedding models: {', '.join(embedding_models)}")
+                    else:
+                        print("\n   ⚠️  No embedding models found!")
+                    
+                    # Store models for later use
+                    self._available_models = models
                     return models
                 else:
                     print("   No models found")
+                    self._available_models = []
                     return []
             else:
                 print(f"? Failed to list models: HTTP {response.status_code}")
@@ -202,48 +218,6 @@ class InteractiveLlamaStackDemo:
         
         return results
     
-    def list_agents(self):
-        """List agents"""
-        print("\n?? Listing agents...")
-        print("=" * 50)
-        
-        headers = {
-            'Authorization': f'Bearer {self.token}',
-            'Content-Type': 'application/json'
-        }
-        
-        try:
-            response = requests.get(
-                f"{self.llamastack_url}/v1/agents",
-                headers=headers,
-                verify=False,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                agents = response.json()
-                print(f"? Successfully retrieved agent list")
-                
-                if isinstance(agents, list):
-                    if agents:
-                        for agent in agents:
-                            agent_id = agent.get('agent_id', 'unknown')
-                            print(f"   ? {agent_id}")
-                    else:
-                        print("   No agents found")
-                else:
-                    print("   Unexpected response format")
-                return True
-            elif response.status_code == 403:
-                print(f"? Access denied to agents API (HTTP 403)")
-                return False
-            else:
-                print(f"? Failed to list agents: HTTP {response.status_code}")
-                print(f"   {response.text}")
-                return False
-        except Exception as e:
-            print(f"? Error listing agents: {e}")
-            return False
     
     def run_demo(self, client_secret: str) -> bool:
         """Run the interactive demo"""
@@ -274,10 +248,34 @@ class InteractiveLlamaStackDemo:
         models = self.list_models()
         
         # Test all models
-        self.test_models()
+        model_results = self.test_models()
         
-        # List agents
-        agent_result = self.list_agents()
+        # Focus on inference access control testing
+        print("\n🤖 Testing Inference Access Control")
+        print("=" * 50)
+        print("This demonstrates how different user roles have different access to models.")
+        
+        # Summary
+        print("\n?? Demo Summary")
+        print("=" * 50)
+        print(f"User: {username}")
+        
+        print("\nModel Access Results:")
+        for model_name, success in model_results:
+            status = "✅ Granted" if success else "❌ Denied"
+            print(f"   {model_name}: {status}")
+        
+        print(f"\n📊 Access Control Summary:")
+        granted_count = sum(1 for _, success in model_results if success)
+        total_count = len(model_results)
+        print(f"   Models accessible: {granted_count}/{total_count}")
+        
+        if granted_count == 0:
+            print("   🔒 No model access - check user roles and policies")
+        elif granted_count == total_count:
+            print("   🔓 Full model access - user has admin-level permissions")
+        else:
+            print("   🔐 Partial model access - role-based restrictions working")
         
         print("\n? Demo completed!")
         return True
