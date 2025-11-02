@@ -25,22 +25,49 @@ The demo features four user personas with different access levels:
    source ./vars.env
    ```
 
-2. **Configure Keycloak**:
+2. **Deploy Keycloak** (if not already deployed):
+
+   Create the Keycloak project and deploy:
+   ```bash
+   oc new-project keycloak
+   oc process -f https://raw.githubusercontent.com/keycloak/keycloak-quickstarts/refs/heads/main/openshift/keycloak.yaml \
+     -p APPLICATION_NAME=kc \
+     -p KEYCLOAK_ADMIN=admin \
+     -p KEYCLOAK_ADMIN_PASSWORD=$KEYCLOAK_ADMIN_PASSWORD \
+     -p NAMESPACE=keycloak | oc create -f -
+   ```
+
+   Get the Keycloak URL and add it to `vars.env`:
+   ```bash
+   KEYCLOAK_URL=https://$(oc get route kc --template='{{ .spec.host }}')
+   vi vars.env # Note: KEYCLOAK_ISSUER_URL with http:// vs KEYCLOAK_JWKS_URL with https://
+   ```
+
+   Update the Frontend URL in Keycloak admin console:
+   ```bash
+   oc port-forward $(oc get pods -l application=kc -o name | head -n1) 8080:8080
+   ```
+   Navigate to http://localhost:8080 in your browser, log in with the Keycloak admin credentials, and update the Frontend URL to match `$KEYCLOAK_URL` (In Realm settings). 
+
+3. **Configure Keycloak**:
    ```bash
    python scripts/setup-keycloak.py
    ```
    This will display the client secret. Copy it to your `vars.env` file.
 
-3. **Deploy LlamaStack**:
+4. **Deploy LlamaStack**:
    ```bash
    source vars.env  # Load environment variables
    ./scripts/deploy.sh
    ```
 
-4. **Run the Demo**:
+   Update  `$LLAMASTACK_URL` in vars.env with the "Access Url" output by the above script
+
+5. **Run the Demo**:
 
    Interactive demo (single user):
    ```bash
+   source vars.env  # Load environment variables
    python scripts/interactive-demo.py
    ```
 
