@@ -57,3 +57,7 @@ The demo implements OAuth2 token-based authentication with role-based access con
 ? OpenAI GPT-4o                   ? ? admin only
 ?????????????????????????????????
 ```
+
+## Development Notes
+
+This demo was developed through multiple iterations using Cursor agent alongside manual editing and debugging. The process involved several failed iterations, manual debugging of issues, and providing guidance to Cursor about how certain components worked. The combination of AI assistance and hands-on refinement helped create a working demo. Your mileage may vary.
