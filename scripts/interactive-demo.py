@@ -42,7 +42,6 @@ class InteractiveLlamaStackDemo:
     
     def get_user_credentials(self) -> tuple[str, str]:
         """Prompt user for credentials"""
-        print("\n?? Please enter your credentials")
         print("=" * 50)
         username = input("Username: ").strip()
         password = getpass.getpass("Password: ")
@@ -143,12 +142,6 @@ class InteractiveLlamaStackDemo:
                         else:
                             print(f"   ? {model}")
                     
-                    # Show embedding models specifically
-                    if embedding_models:
-                        print(f"\n   Available embedding models: {', '.join(embedding_models)}")
-                    else:
-                        print("\n   ⚠️  No embedding models found!")
-                    
                     # Store models for later use
                     self._available_models = models
                     return models
@@ -245,39 +238,11 @@ class InteractiveLlamaStackDemo:
             print(f"   Expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(claims.get('exp', 0)))}")
         
         # List models
-        models = self.list_models()
+        self.list_models()
         
         # Test all models
-        model_results = self.test_models()
+        self.test_models()
         
-        # Focus on inference access control testing
-        print("\n🤖 Testing Inference Access Control")
-        print("=" * 50)
-        print("This demonstrates how different user roles have different access to models.")
-        
-        # Summary
-        print("\n?? Demo Summary")
-        print("=" * 50)
-        print(f"User: {username}")
-        
-        print("\nModel Access Results:")
-        for model_name, success in model_results:
-            status = "✅ Granted" if success else "❌ Denied"
-            print(f"   {model_name}: {status}")
-        
-        print(f"\n📊 Access Control Summary:")
-        granted_count = sum(1 for _, success in model_results if success)
-        total_count = len(model_results)
-        print(f"   Models accessible: {granted_count}/{total_count}")
-        
-        if granted_count == 0:
-            print("   🔒 No model access - check user roles and policies")
-        elif granted_count == total_count:
-            print("   🔓 Full model access - user has admin-level permissions")
-        else:
-            print("   🔐 Partial model access - role-based restrictions working")
-        
-        print("\n? Demo completed!")
         return True
 
 def main():
