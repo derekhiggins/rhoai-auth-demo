@@ -71,6 +71,11 @@ The demo features four user personas with different access levels:
    python scripts/interactive-demo.py
    ```
 
+   Demo users (configured by setup-keycloak.py):
+   - `admin-user` / `admin123` (admin role - full access to all models)
+   - `datascience-user` / `ds123` (datascience role - vllm and gpt-4o-mini)
+   - `basic-user` / `basic123` (basic role - vllm only)
+
 ## Architecture
 
 The demo implements OAuth2 token-based authentication with role-based access control:
