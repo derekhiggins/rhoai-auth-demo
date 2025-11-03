@@ -4,7 +4,7 @@ This demo showcases role-based access control for LlamaStack using Keycloak auth
 
 ## Overview
 
-The demo features four user personas with different access levels:
+The demo features three user personas with different access levels:
 - **Admin**: Full access to all models
 - **Data Science**: Access to vllm and GPT-4o-mini
 - **Basic**: Basic inference access (vLLM only)
