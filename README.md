@@ -90,6 +90,17 @@ The demo implements OAuth2 token-based authentication with role-based access con
 ?????????????????????????????????
 ```
 
+## Scripts
+
+### `setup-keycloak.py`
+Automatically configures Keycloak for the demo. Creates the realm, client, roles (admin, datascience, basic), demo users, and protocol mappers. Displays the client secret needed for authentication.
+
+### `deploy.sh`
+Deploys the LlamaStack distribution to OpenShift. Creates ConfigMaps from the run configuration, deploys the LlamaStackDistribution resource, creates the route, and waits for the deployment to be ready.
+
+### `interactive-demo.py`
+Interactive authentication demo that prompts for user credentials, obtains OAuth tokens from Keycloak, and tests access to various models based on role permissions. Shows which models each user role can access.
+
 ## Development Notes
 
 This demo was developed through multiple iterations using Cursor agent alongside manual editing and debugging. The process involved several failed iterations, manual debugging of issues, and providing guidance to Cursor about how certain components worked. The combination of AI assistance and hands-on refinement helped create a working demo. Your mileage may vary.
