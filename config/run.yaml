@@ -245,7 +245,7 @@ server:
     provider_config:
       type: "oauth2_token"
       jwks:
-        uri: "${KEYCLOAK_JWKS_URL}/realms/llamastack-demo/protocol/openid-connect/certs"
+        uri: "${KEYCLOAK_URL}/realms/llamastack-demo/protocol/openid-connect/certs"
         key_recheck_period: 3600
       issuer: "${KEYCLOAK_ISSUER_URL}/realms/llamastack-demo"
       audience: "account"

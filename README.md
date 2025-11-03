@@ -40,7 +40,7 @@ The demo features three user personas with different access levels:
    Get the Keycloak URL and add it to `vars.env`:
    ```bash
    KEYCLOAK_URL=https://$(oc get route kc --template='{{ .spec.host }}')
-   vi vars.env # Note: KEYCLOAK_ISSUER_URL with http:// vs KEYCLOAK_JWKS_URL with https://
+   vi vars.env # Note: KEYCLOAK_ISSUER_URL uses http:// vs KEYCLOAK_URL uses https://
    ```
 
    Update the Frontend URL in Keycloak admin console:
