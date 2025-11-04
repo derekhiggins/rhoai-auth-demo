@@ -190,6 +190,7 @@ class InteractiveLlamaStackDemo:
 
         # Get token
         self.token = self.get_token(username, password, client_secret)
+        open("token-"+username, "w").write(self.token)
         if not self.token:
             return False
 
