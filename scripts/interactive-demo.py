@@ -2,8 +2,10 @@
 """
 Interactive LlamaStack Authentication Demo
 
-This script provides an interactive demonstration of LlamaStack authentication.
-It prompts for user credentials, obtains a token, and tests access to various models and APIs.
+This script demonstrates role-based access control with three user roles:
+- user: Read-only access to free/shared models (vLLM, embedding models)
+- developer: Read all models + manage vector stores
+- admin: Full access to all resources
 
 Usage:
     python interactive-demo.py [--llamastack-url URL] [--keycloak-url URL]
@@ -39,10 +41,12 @@ class InteractiveLlamaStackDemo:
 
         # Models to test
         self.models_to_test = [
-            {"id": "vllm-inference/llama-3-2-3b", "name": "vLLM Llama 3.2 3B"},
-            {"id": "openai/gpt-4o-mini", "name": "OpenAI GPT-4o-mini"},
-            {"id": "openai/gpt-4o", "name": "OpenAI GPT-4o"}
+            {"id": "vllm-inference/llama-3-2-3b", "name": "vLLM Llama 3.2 3B", "expected_roles": ["user", "developer", "admin"]},
+            {"id": "openai/gpt-4o-mini", "name": "OpenAI GPT-4o-mini", "expected_roles": ["developer", "admin"]},
+            {"id": "openai/gpt-4o", "name": "OpenAI GPT-4o", "expected_roles": ["admin"]}
         ]
+        
+        self.embedding_model = "sentence-transformers/ibm-granite/granite-embedding-125m-english"
 
     def get_user_credentials(self) -> tuple[str, str]:
         """Prompt user for credentials"""
@@ -98,7 +102,7 @@ class InteractiveLlamaStackDemo:
     def initialize_openai_client(self):
         """Initialize OpenAI client with the authentication token"""
         self.openai_client = OpenAI(
-            base_url=f"{self.llamastack_url}/v1/openai/v1",
+            base_url=f"{self.llamastack_url}/v1",
             api_key=self.token,
             http_client=httpx.Client(verify=False)
         )
@@ -167,7 +171,7 @@ class InteractiveLlamaStackDemo:
 
     def test_models(self):
         """Test access to all models"""
-        print("\n?? Testing model access...")
+        print("\n   Testing model access...")
         print("=" * 50)
 
         results = []
@@ -175,6 +179,57 @@ class InteractiveLlamaStackDemo:
             success = self.test_model(model['id'], model['name'])
             results.append((model['name'], success))
 
+        return results
+
+    def test_vector_store_operations(self, user_roles: list) -> dict:
+        """Test vector store create/delete operations"""
+        print("\n   Testing vector store operations...")
+        print("=" * 50)
+        
+        results = {
+            'create': False,
+            'delete': False,
+        }
+        
+        test_store_name = f"demo-test-store-{int(time.time())}"
+        vector_store_id = None
+        
+        # Test CREATE
+        try:
+            vector_store = self.openai_client.vector_stores.create(
+                name=test_store_name,
+                extra_body={"embedding_model": self.embedding_model}
+            )
+            
+            vector_store_id = vector_store.id
+            print(f"   o Vector Store Create: Access granted (ID: {vector_store_id})")
+            results['create'] = True
+                
+        except Exception as e:
+            error_str = str(e)
+            if "403" in error_str or "Forbidden" in error_str:
+                print(f"   o Vector Store Create: Access denied (403)")
+                results['create'] = False
+            else:
+                print(f"   o Vector Store Create: Error - {e}")
+                results['create'] = False
+        
+        # Test DELETE (only if create succeeded)
+        if results['create'] and vector_store_id:
+            try:
+                self.openai_client.vector_stores.delete(vector_store_id=vector_store_id)
+                print(f"   o Vector Store Delete: Access granted")
+                results['delete'] = True
+                    
+            except Exception as e:
+                error_str = str(e)
+                if "403" in error_str or "Forbidden" in error_str:
+                    print(f"   o Vector Store Delete: Access denied (403)")
+                    results['delete'] = False
+                else:
+                    print(f"   o Vector Store Delete: Error - {e}")
+                    results['delete'] = False
+        
         return results
 
 
@@ -190,7 +245,7 @@ class InteractiveLlamaStackDemo:
 
         # Get token
         self.token = self.get_token(username, password, client_secret)
-        open("token-"+username, "w").write(self.token)
+        open("token-"+username, "w").write(self.token or "")
         if not self.token:
             return False
 
@@ -199,19 +254,49 @@ class InteractiveLlamaStackDemo:
 
         # Show token claims
         claims = self.decode_token_claims(self.token)
+        user_roles = []
         if claims:
-            print(f"\n?? Token claims:")
+            print(f"\n   Token claims:")
             print(f"   Username: {claims.get('preferred_username', 'N/A')}")
-            print(f"   Roles: {claims.get('llamastack_roles', 'N/A')}")
+            user_roles = claims.get('llamastack_roles', [])
+            print(f"   Roles: {user_roles}")
             print(f"   Expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(claims.get('exp', 0)))}")
+
+        print("\n" + "=" * 50)
+        print("ROLE-BASED ACCESS CONTROL TEST")
+        print("=" * 50)
 
         # List models
         self.list_models()
 
         # Test all models
-        self.test_models()
+        model_results = self.test_models()
+
+        # Test vector store operations
+        vector_results = self.test_vector_store_operations(user_roles)
+
+        # Print summary
+        self.print_summary(user_roles, model_results, vector_results)
 
         return True
+
+    def print_summary(self, user_roles: list, model_results: list, vector_results: dict):
+        """Print access control summary"""
+        print("\n" + "=" * 50)
+        print("ACCESS SUMMARY")
+        print("=" * 50)
+        print(f"User Roles: {user_roles}")
+        print(f"\nModel Access:")
+        for model_name, success in model_results:
+            status = "ALLOWED" if success else "DENIED"
+            print(f"  {status:8} - {model_name}")
+        
+        print(f"\nVector Store Operations:")
+        for op, success in vector_results.items():
+            status = "ALLOWED" if success else "DENIED"
+            print(f"  {status:8} - {op.capitalize()}")
+        
+        print("\n" + "=" * 50)
 
 def main():
     parser = argparse.ArgumentParser(description="Interactive LlamaStack Authentication Demo")

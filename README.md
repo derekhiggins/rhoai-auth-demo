@@ -7,9 +7,9 @@ This repository targets RHOAI Next on the main branch. For other releases, check
 ## Overview
 
 The demo features three user personas with different access levels:
-- **Admin**: Full access to all models
-- **Data Science**: Access to vllm and GPT-4o-mini
-- **Basic**: Basic inference access (vLLM only)
+- **Admin**: Full access to all resources and operations
+- **Developer**: Read all models, manage vector stores and tool groups
+- **User**: Read-only access to free/shared models (vLLM, embedding models)
 
 ## Prerequisites
 
@@ -74,28 +74,30 @@ The demo features three user personas with different access levels:
    ```
 
    Demo users (configured by setup-keycloak.py):
-   - `admin-user` / `admin123` (admin role - full access to all models)
-   - `datascience-user` / `ds123` (datascience role - vllm and gpt-4o-mini)
-   - `basic-user` / `basic123` (basic role - vllm only)
+   - `admin-user` / `admin123` (admin role - full access)
+   - `developer-user` / `dev123` (developer role - all models + data management)
+   - `user-user` / `user123` (user role - free models only)
 
 ## Architecture
 
 The demo implements OAuth2 token-based authentication with role-based access control:
 
-```
-?????????????????????????????????
-?          Resources              ?
-???????????????????????????????????
-? vLLM Model (llama-3-2-3b)       ? ? All authenticated users
-? OpenAI GPT-4o-mini              ? ? datascience, admin
-? OpenAI GPT-4o                   ? ? admin only
-?????????????????????????????????
-```
+| Resource Type          | User    | Developer | Admin       |
+|------------------------|---------|-----------|-------------|
+| vLLM Models            | Read    | Read      | Full (CRD)  |
+| Embedding Models       | Read    | Read      | Full (CRD)  |
+| OpenAI Models          | -       | Read      | Full (CRD)  |
+| Vector Stores          | -       | Full (CRD)| Full (CRD)  |
+| Tool Groups            | -       | Read      | Full (CRD)  |
+| SQL Records            | -       | Read      | Full (CRD)  |
+| Scoring Functions      | -       | Read      | Full (CRD)  |
+
+**Legend:** CRD = Create, Read, Delete
 
 ## Scripts
 
 ### `setup-keycloak.py`
-Automatically configures Keycloak for the demo. Creates the realm, client, roles (admin, datascience, basic), demo users, and protocol mappers. Displays the client secret needed for authentication.
+Automatically configures Keycloak for the demo. Creates the realm, client, roles (admin, developer, user), demo users, and protocol mappers. Displays the client secret needed for authentication.
 
 ### `deploy.sh`
 Deploys the LlamaStack distribution to OpenShift. Creates ConfigMaps from the run configuration, deploys the LlamaStackDistribution resource, creates the route, and waits for the deployment to be ready.

@@ -237,36 +237,47 @@ server:
       claims_mapping:
         llamastack_roles: "roles"
     access_policy:
-      # Policy 1: Allow all authenticated users to access vLLM models
+      # User role: read-only access to free/shared models
       - permit:
           actions: [read]
           resource: model::vllm-inference/llama-3-2-3b
-        description: Allow all authenticated users to access Llama 3.2 model via vLLM
-      # Policy 2: Allow datascience and admin roles to access OpenAI GPT-4o-mini
+        when: user with user in roles
+        description: Users can read vLLM Llama model
       - permit:
           actions: [read]
-          resource: model::openai/gpt-4o-mini
-        when: user with datascience in roles
-        description: Allow datascience users to access GPT-4o-mini model
+          resource: model::sentence-transformers/ibm-granite/granite-embedding-125m-english
+        when: user with user in roles
+        description: Users can read embedding models
+
+      # Developer role: broader model access + vector store management
       - permit:
           actions: [read]
-          resource: model::openai/gpt-4o-mini
+          resource: model::*
+        when: user with developer in roles
+        description: Developers can read all models
+      - permit:
+          actions: [create, read, delete]
+          resource: vector_store::*
+        when: user with developer in roles
+        description: Developers can manage vector stores
+      - permit:
+          actions: [read]
+          resource: tool_group::*
+        when: user with developer in roles
+        description: Developers can read tool groups
+      - permit:
+          actions: [read]
+          resource: sql_record::*
+        when: user with developer in roles
+        description: Developers can read SQL records
+      - permit:
+          actions: [read]
+          resource: scoring_function::*
+        when: user with developer in roles
+        description: Developers can read scoring functions
+
+      # Admin role: full access to everything
+      - permit:
+          actions: [create, read, delete]
         when: user with admin in roles
-        description: Allow admin users to access GPT-4o-mini model
-      # Policy 3: Allow only admin role to access OpenAI GPT-4o
-      - permit:
-          actions: [read]
-          resource: model::openai/gpt-4o
-        when: user with admin in roles
-        description: Allow only admin users to access GPT-4o model
-      # Policy 4: Allow all datascience and admin users to access granite-embedding-125m models
-      - permit:
-          actions: [read]
-          resource: model::granite-embedding-125m
-        when: user with datascience in roles
-        description: Allow datascience users to access GPT-4o-mini model
-      - permit:
-          actions: [read]
-          resource: model::granite-embedding-125m
-        when: user with admin in roles
-        description: Allow admin users to access GPT-4o-mini model
+        description: Admins have full access to all resources

@@ -160,9 +160,9 @@ class KeycloakSetup:
         }
         
         roles = [
-            {"name": "admin", "description": "Full access to all models and operations"},
-            {"name": "datascience", "description": "Access to vllm and GPT-4o-mini"},
-            {"name": "basic", "description": "Basic inference access to vLLM models only"}
+            {"name": "admin", "description": "Full access to all resources and operations"},
+            {"name": "developer", "description": "Read all models, manage vector stores and tool groups"},
+            {"name": "user", "description": "Read-only access to free/shared models"}
         ]
         
         success = True
@@ -240,24 +240,24 @@ class KeycloakSetup:
                 "roles": ["admin"]
             },
             {
-                "username": "datascience-user", 
-                "email": "datascience@example.com",
-                "firstName": "Data Science",
+                "username": "developer-user", 
+                "email": "developer@example.com",
+                "firstName": "Developer",
                 "lastName": "User",
                 "enabled": True,
                 "emailVerified": True,
-                "credentials": [{"type": "password", "value": "ds123", "temporary": False}],
-                "roles": ["datascience"]
+                "credentials": [{"type": "password", "value": "dev123", "temporary": False}],
+                "roles": ["developer"]
             },
             {
-                "username": "basic-user",
-                "email": "basic@example.com", 
-                "firstName": "Basic",
+                "username": "user-user",
+                "email": "user@example.com", 
+                "firstName": "Regular",
                 "lastName": "User",
                 "enabled": True,
                 "emailVerified": True,
-                "credentials": [{"type": "password", "value": "basic123", "temporary": False}],
-                "roles": ["basic"]
+                "credentials": [{"type": "password", "value": "user123", "temporary": False}],
+                "roles": ["user"]
             }
         ]
         
@@ -360,8 +360,8 @@ class KeycloakSetup:
                 
                 print(f"\n👥 Demo Users:")
                 print(f"   admin-user / admin123 (admin role)")
-                print(f"   datascience-user / ds123 (datascience role)")
-                print(f"   basic-user / basic123 (basic role)")
+                print(f"   developer-user / dev123 (developer role)")
+                print(f"   user-user / user123 (user role)")
             
             print("\n✅ Keycloak setup completed successfully!")
             return True
