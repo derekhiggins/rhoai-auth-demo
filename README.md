@@ -2,6 +2,8 @@
 
 This demo showcases role-based access control for LlamaStack using Keycloak authentication on Red Hat OpenShift AI (RHOAI).
 
+This repository targets RHOAI Next on the main branch. For other releases, check the corresponding branches (e.g., rhoai-3.0).
+
 ## Overview
 
 The demo features three user personas with different access levels:
