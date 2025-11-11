@@ -237,7 +237,7 @@ server:
       claims_mapping:
         llamastack_roles: "roles"
     access_policy:
-      # User role: read-only access to free/shared models
+      # User role: read-only access to in-house models
       - permit:
           actions: [read]
           resource: model::vllm-inference/llama-3-2-3b
@@ -252,9 +252,19 @@ server:
       # Developer role: broader model access + vector store management
       - permit:
           actions: [read]
-          resource: model::*
+          resource: model::vllm-inference/llama-3-2-3b
         when: user with developer in roles
-        description: Developers can read all models
+        description: Developers can read vLLM Llama model
+      - permit:
+          actions: [read]
+          resource: model::openai/gpt-4o-mini
+        when: user with developer in roles
+        description: Developers can read openai/gpt-4o-mini
+      - permit:
+          actions: [read]
+          resource: model::sentence-transformers/ibm-granite/granite-embedding-125m-english
+        when: user with developer in roles
+        description: Developers can read embedding models
       - permit:
           actions: [create, read, delete]
           resource: vector_store::*
