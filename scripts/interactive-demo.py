@@ -45,7 +45,7 @@ class InteractiveLlamaStackDemo:
             {"id": "openai/gpt-4o-mini", "name": "OpenAI GPT-4o-mini", "expected_roles": ["developer", "admin"]},
             {"id": "openai/gpt-4o", "name": "OpenAI GPT-4o", "expected_roles": ["admin"]}
         ]
-        
+
         self.embedding_model = "sentence-transformers/ibm-granite/granite-embedding-125m-english"
 
     def get_user_credentials(self) -> tuple[str, str]:
@@ -185,26 +185,26 @@ class InteractiveLlamaStackDemo:
         """Test vector store create/delete operations"""
         print("\n   Testing vector store operations...")
         print("=" * 50)
-        
+
         results = {
             'create': False,
             'delete': False,
         }
-        
+
         test_store_name = f"demo-test-store-{int(time.time())}"
         vector_store_id = None
-        
+
         # Test CREATE
         try:
             vector_store = self.openai_client.vector_stores.create(
                 name=test_store_name,
                 extra_body={"embedding_model": self.embedding_model}
             )
-            
+
             vector_store_id = vector_store.id
             print(f"   o Vector Store Create: Access granted (ID: {vector_store_id})")
             results['create'] = True
-                
+
         except Exception as e:
             error_str = str(e)
             if "403" in error_str or "Forbidden" in error_str:
@@ -213,14 +213,14 @@ class InteractiveLlamaStackDemo:
             else:
                 print(f"   o Vector Store Create: Error - {e}")
                 results['create'] = False
-        
+
         # Test DELETE (only if create succeeded)
         if results['create'] and vector_store_id:
             try:
                 self.openai_client.vector_stores.delete(vector_store_id=vector_store_id)
                 print(f"   o Vector Store Delete: Access granted")
                 results['delete'] = True
-                    
+
             except Exception as e:
                 error_str = str(e)
                 if "403" in error_str or "Forbidden" in error_str:
@@ -229,7 +229,7 @@ class InteractiveLlamaStackDemo:
                 else:
                     print(f"   o Vector Store Delete: Error - {e}")
                     results['delete'] = False
-        
+
         return results
 
 
@@ -290,17 +290,17 @@ class InteractiveLlamaStackDemo:
         for model_name, success in model_results:
             status = "ALLOWED" if success else "DENIED"
             print(f"  {status:8} - {model_name}")
-        
+
         print(f"\nVector Store Operations:")
         for op, success in vector_results.items():
             status = "ALLOWED" if success else "DENIED"
             print(f"  {status:8} - {op.capitalize()}")
-        
+
         print("\n" + "=" * 50)
 
 def main():
     parser = argparse.ArgumentParser(description="Interactive LlamaStack Authentication Demo")
-    parser.add_argument("--llamastack-url", 
+    parser.add_argument("--llamastack-url",
                        default=os.getenv("LLAMASTACK_URL", "http://localhost:8321"),
                        help="LlamaStack server URL")
     parser.add_argument("--keycloak-url",

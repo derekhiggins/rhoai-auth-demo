@@ -230,7 +230,7 @@ class KeycloakSetup:
         
         users = [
             {
-                "username": "admin-user",
+                "username": "admin",
                 "email": "admin@example.com",
                 "firstName": "Admin",
                 "lastName": "User",
@@ -240,7 +240,7 @@ class KeycloakSetup:
                 "roles": ["admin"]
             },
             {
-                "username": "developer-user", 
+                "username": "developer", 
                 "email": "developer@example.com",
                 "firstName": "Developer",
                 "lastName": "User",
@@ -250,7 +250,7 @@ class KeycloakSetup:
                 "roles": ["developer"]
             },
             {
-                "username": "user-user",
+                "username": "user",
                 "email": "user@example.com", 
                 "firstName": "Regular",
                 "lastName": "User",
@@ -359,9 +359,9 @@ class KeycloakSetup:
                 print(f"   Token Endpoint: {self.base_url}/realms/{self.realm_name}/protocol/openid-connect/token")
                 
                 print(f"\n👥 Demo Users:")
-                print(f"   admin-user / admin123 (admin role)")
-                print(f"   developer-user / dev123 (developer role)")
-                print(f"   user-user / user123 (user role)")
+                print(f"   admin / admin123 (admin role)")
+                print(f"   developer / dev123 (developer role)")
+                print(f"   user / user123 (user role)")
             
             print("\n✅ Keycloak setup completed successfully!")
             return True

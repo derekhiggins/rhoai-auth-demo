@@ -74,9 +74,9 @@ The demo features three user personas with different access levels:
    ```
 
    Demo users (configured by setup-keycloak.py):
-   - `admin-user` / `admin123` (admin role - full access)
-   - `developer-user` / `dev123` (developer role - all models + data management)
-   - `user-user` / `user123` (user role - free models only)
+   - `admin` / `admin123` (admin role - full access)
+   - `developer` / `dev123` (developer role - all models + data management)
+   - `user` / `user123` (user role - free models only)
 
 ## Architecture
 
