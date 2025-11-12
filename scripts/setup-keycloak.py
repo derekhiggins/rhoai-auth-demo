@@ -161,7 +161,7 @@ class KeycloakSetup:
         
         roles = [
             {"name": "admin", "description": "Full access to all resources and operations"},
-            {"name": "developer", "description": "Read all models, manage vector stores and tool groups"},
+            {"name": "developer", "description": "Read most models, manage vector stores and files"},
             {"name": "user", "description": "Read-only access to free/shared models"}
         ]
         

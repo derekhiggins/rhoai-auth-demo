@@ -8,7 +8,7 @@ This repository targets RHOAI Next on the main branch. For other releases, check
 
 The demo features three user personas with different access levels:
 - **Admin**: Full access to all resources and operations
-- **Developer**: Read all models, manage vector stores and tool groups
+- **Developer**: Read most models, manage vector stores and files
 - **User**: Read-only access to free/shared models (vLLM, embedding models)
 
 ## Prerequisites
@@ -90,9 +90,8 @@ The demo implements OAuth2 token-based authentication with role-based access con
 | Files                  | -       | Full (CRD)| Full (CRD)  |
 | Vector Stores          | -       | Full (CRD)| Full (CRD)  |
 | Vector Store Files     | -       | Full (CRD)| Full (CRD)  |
-| Tool Groups            | -       | Read      | Full (CRD)  |
+| MCP Servers            | Read    | Read      | Full (CRD)  |
 | SQL Records            | -       | Read      | Full (CRD)  |
-| Scoring Functions      | -       | Read      | Full (CRD)  |
 
 **Legend:** CRD = Create, Read, Delete
 
@@ -111,6 +110,18 @@ o Model access across different providers (vLLM, OpenAI)
 o File operations (upload, list, delete)
 o Vector store operations (create, delete)
 o Vector store file attachments (end-to-end workflow)
+o Responses API with MCP server tools (demonstrates external tool integration)
+
+All demonstrations use only the OpenAI Python client for API interactions.
+
+## MCP Server Integration
+
+The demo includes integration with the DeepWiki MCP (Model Context Protocol) server, which provides three tools:
+- `ask_question`: Query knowledge bases
+- `read_wiki_structure`: Read wiki structure information
+- `read_wiki_contents`: Read wiki content
+
+The demo uses the `responses.create()` API with MCP tools to demonstrate how models can dynamically connect to external MCP servers at runtime. The MCP server URL (`https://mcp.deepwiki.com/mcp`) is provided directly in the API call, allowing flexible integration with external services. The demo queries the deepwiki server about the llamastack/llama-stack project to show real-world MCP tool usage.
 
 ## Development Notes
 

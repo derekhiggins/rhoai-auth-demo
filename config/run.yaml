@@ -272,19 +272,9 @@ server:
         description: Developers can manage vector stores
       - permit:
           actions: [read]
-          resource: tool_group::*
-        when: user with developer in roles
-        description: Developers can read tool groups
-      - permit:
-          actions: [read]
           resource: sql_record::*
         when: user with developer in roles
         description: Developers can read SQL records
-      - permit:
-          actions: [read]
-          resource: scoring_function::*
-        when: user with developer in roles
-        description: Developers can read scoring functions
 
       # Admin role: full access to everything
       - permit:

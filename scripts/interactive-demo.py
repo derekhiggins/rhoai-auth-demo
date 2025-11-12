@@ -4,8 +4,10 @@ Interactive LlamaStack Authentication Demo
 
 This script demonstrates role-based access control with three user roles:
 - user: Read-only access to free/shared models (vLLM, embedding models)
-- developer: Read all models + manage vector stores
+- developer: Read all models + manage vector stores and files
 - admin: Full access to all resources
+
+Demonstrates RBAC using only the OpenAI Python client for API interactions.
 
 Usage:
     python interactive-demo.py [--llamastack-url URL] [--keycloak-url URL]
@@ -126,8 +128,8 @@ class InteractiveLlamaStackDemo:
                         models.append(model)
 
             if models:
-                print("   Available models:")
-                for model in models:
+                print(f"   Available models({len(models)}):")
+                for model in models[:10]:
                     if isinstance(model, dict):
                         model_id = model.get('id', 'unknown')
                         print(f"   ? {model_id}")
@@ -326,6 +328,47 @@ class InteractiveLlamaStackDemo:
 
         return results
 
+    def test_responses_with_mcp(self) -> dict:
+        """Test responses API with MCP server tools"""
+        print("\n   Testing responses with MCP tools...")
+        print("=" * 50)
+
+        results = {
+            'responses_with_mcp': False,
+        }
+
+        # Test responses.create with MCP server
+        try:
+            response = self.openai_client.responses.create(
+                model="vllm-inference/llama-3-2-3b",
+                tools=[
+                    {
+                        "type": "mcp",
+                        "server_label": "deepwiki",
+                        "server_description": "DeepWiki MCP server for wiki queries",
+                        "server_url": "https://mcp.deepwiki.com/mcp",
+                        "require_approval": "never",
+                    }
+                ],
+                input="What version of python is used in the llamastack/llama-stack project, be brief and to the point? Make sure to use the deepwiki ask_question tool to answer the question.",
+                stream=False,
+            )
+
+            print(f"   o Responses with MCP Tools: Access granted")
+            if hasattr(response, 'output_text') and response.output_text:
+                print(f"      Response: {response.output_text[:100]}...")
+            results['responses_with_mcp'] = True
+
+        except Exception as e:
+            error_str = str(e)
+            if "403" in error_str or "Forbidden" in error_str:
+                print(f"   o Responses with MCP Tools: Access denied (403)")
+            else:
+                print(f"   o Responses with MCP Tools: Error - {e}")
+            results['responses_with_mcp'] = False
+
+        return results
+
 
     def run_demo(self, client_secret: str) -> bool:
         """Run the interactive demo"""
@@ -372,16 +415,19 @@ class InteractiveLlamaStackDemo:
         # Test vector store operations (with file if available)
         vector_results = self.test_vector_store_operations(user_roles, test_file_id)
 
+        # Test responses API with MCP tools
+        mcp_results = self.test_responses_with_mcp()
+
         # Cleanup: test file delete
         file_delete_result = self.cleanup_test_file(test_file_id)
         file_results['delete'] = file_delete_result
 
         # Print summary
-        self.print_summary(user_roles, model_results, file_results, vector_results)
+        self.print_summary(user_roles, model_results, file_results, vector_results, mcp_results)
 
         return True
 
-    def print_summary(self, user_roles: list, model_results: list, file_results: dict, vector_results: dict):
+    def print_summary(self, user_roles: list, model_results: list, file_results: dict, vector_results: dict, mcp_results: dict):
         """Print access control summary"""
         print("\n" + "=" * 50)
         print("ACCESS SUMMARY")
@@ -399,6 +445,12 @@ class InteractiveLlamaStackDemo:
 
         print(f"\nVector Store Operations:")
         for op, success in vector_results.items():
+            status = "ALLOWED" if success else "DENIED"
+            op_name = op.replace('_', ' ').capitalize()
+            print(f"  {status:8} - {op_name}")
+
+        print(f"\nMCP Operations:")
+        for op, success in mcp_results.items():
             status = "ALLOWED" if success else "DENIED"
             op_name = op.replace('_', ' ').capitalize()
             print(f"  {status:8} - {op_name}")
