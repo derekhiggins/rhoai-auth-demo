@@ -181,14 +181,86 @@ class InteractiveLlamaStackDemo:
 
         return results
 
-    def test_vector_store_operations(self, user_roles: list) -> dict:
-        """Test vector store create/delete operations"""
+    def test_file_operations(self) -> tuple[dict, Optional[str]]:
+        """Test file upload and list operations (keeps file for vector store test)"""
+        print("\n   Testing file operations...")
+        print("=" * 50)
+
+        results = {
+            'upload': False,
+            'list': False,
+        }
+
+        file_id = None
+        test_content = f"Sample document for RBAC testing - {int(time.time())}"
+
+        # Test UPLOAD
+        try:
+            import io
+            file_obj = self.openai_client.files.create(
+                file=("test-rbac.txt", io.BytesIO(test_content.encode())),
+                purpose="assistants"
+            )
+            file_id = file_obj.id
+            print(f"   o File Upload: Access granted (ID: {file_id})")
+            results['upload'] = True
+
+        except Exception as e:
+            error_str = str(e)
+            if "403" in error_str or "Forbidden" in error_str:
+                print(f"   o File Upload: Access denied (403)")
+            else:
+                print(f"   o File Upload: Error - {e}")
+            results['upload'] = False
+
+        # Test LIST
+        try:
+            files_list = self.openai_client.files.list()
+            print(f"   o File List: Access granted")
+            results['list'] = True
+
+        except Exception as e:
+            error_str = str(e)
+            if "403" in error_str or "Forbidden" in error_str:
+                print(f"   o File List: Access denied (403)")
+            else:
+                print(f"   o File List: Error - {e}")
+            results['list'] = False
+
+        # Note: File will be kept for vector store attachment test
+        return results, file_id
+
+    def cleanup_test_file(self, file_id: Optional[str]) -> bool:
+        """Test file delete operation (cleanup after tests)"""
+        print("\n   Testing file cleanup...")
+        print("=" * 50)
+
+        if not file_id:
+            print(f"   o File Delete: Skipped (no file to delete)")
+            return False
+
+        try:
+            self.openai_client.files.delete(file_id)
+            print(f"   o File Delete: Access granted")
+            return True
+
+        except Exception as e:
+            error_str = str(e)
+            if "403" in error_str or "Forbidden" in error_str:
+                print(f"   o File Delete: Access denied (403)")
+            else:
+                print(f"   o File Delete: Error - {e}")
+            return False
+
+    def test_vector_store_operations(self, user_roles: list, test_file_id: Optional[str] = None) -> dict:
+        """Test vector store create/delete operations and file attachments"""
         print("\n   Testing vector store operations...")
         print("=" * 50)
 
         results = {
             'create': False,
             'delete': False,
+            'attach_file': False,
         }
 
         test_store_name = f"demo-test-store-{int(time.time())}"
@@ -213,6 +285,28 @@ class InteractiveLlamaStackDemo:
             else:
                 print(f"   o Vector Store Create: Error - {e}")
                 results['create'] = False
+
+        # Test FILE ATTACHMENT (only if create succeeded and we have a file)
+        if results['create'] and vector_store_id and test_file_id:
+            try:
+                vs_file = self.openai_client.vector_stores.files.create(
+                    vector_store_id=vector_store_id,
+                    file_id=test_file_id
+                )
+                print(f"   o Vector Store Attach File: Access granted")
+                results['attach_file'] = True
+
+            except Exception as e:
+                error_str = str(e)
+                if "403" in error_str or "Forbidden" in error_str:
+                    print(f"   o Vector Store Attach File: Access denied (403)")
+                elif "not found" in error_str.lower():
+                    print(f"   o Vector Store Attach File: File not found (already deleted)")
+                else:
+                    print(f"   o Vector Store Attach File: Error - {e}")
+                results['attach_file'] = False
+        elif not test_file_id:
+            print(f"   o Vector Store Attach File: Skipped (no file available)")
 
         # Test DELETE (only if create succeeded)
         if results['create'] and vector_store_id:
@@ -272,15 +366,22 @@ class InteractiveLlamaStackDemo:
         # Test all models
         model_results = self.test_models()
 
-        # Test vector store operations
-        vector_results = self.test_vector_store_operations(user_roles)
+        # Test file operations
+        file_results, test_file_id = self.test_file_operations()
+
+        # Test vector store operations (with file if available)
+        vector_results = self.test_vector_store_operations(user_roles, test_file_id)
+
+        # Cleanup: test file delete
+        file_delete_result = self.cleanup_test_file(test_file_id)
+        file_results['delete'] = file_delete_result
 
         # Print summary
-        self.print_summary(user_roles, model_results, vector_results)
+        self.print_summary(user_roles, model_results, file_results, vector_results)
 
         return True
 
-    def print_summary(self, user_roles: list, model_results: list, vector_results: dict):
+    def print_summary(self, user_roles: list, model_results: list, file_results: dict, vector_results: dict):
         """Print access control summary"""
         print("\n" + "=" * 50)
         print("ACCESS SUMMARY")
@@ -291,10 +392,16 @@ class InteractiveLlamaStackDemo:
             status = "ALLOWED" if success else "DENIED"
             print(f"  {status:8} - {model_name}")
 
+        print(f"\nFile Operations:")
+        for op, success in file_results.items():
+            status = "ALLOWED" if success else "DENIED"
+            print(f"  {status:8} - {op.capitalize()}")
+
         print(f"\nVector Store Operations:")
         for op, success in vector_results.items():
             status = "ALLOWED" if success else "DENIED"
-            print(f"  {status:8} - {op.capitalize()}")
+            op_name = op.replace('_', ' ').capitalize()
+            print(f"  {status:8} - {op_name}")
 
         print("\n" + "=" * 50)
 

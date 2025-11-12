@@ -87,7 +87,9 @@ The demo implements OAuth2 token-based authentication with role-based access con
 | vLLM Models            | Read    | Read      | Full (CRD)  |
 | Embedding Models       | Read    | Read      | Full (CRD)  |
 | OpenAI Models          | -       | Read      | Full (CRD)  |
+| Files                  | -       | Full (CRD)| Full (CRD)  |
 | Vector Stores          | -       | Full (CRD)| Full (CRD)  |
+| Vector Store Files     | -       | Full (CRD)| Full (CRD)  |
 | Tool Groups            | -       | Read      | Full (CRD)  |
 | SQL Records            | -       | Read      | Full (CRD)  |
 | Scoring Functions      | -       | Read      | Full (CRD)  |
@@ -103,7 +105,12 @@ Automatically configures Keycloak for the demo. Creates the realm, client, roles
 Deploys the LlamaStack distribution to OpenShift. Creates ConfigMaps from the run configuration, deploys the LlamaStackDistribution resource, creates the route, and waits for the deployment to be ready.
 
 ### `interactive-demo.py`
-Interactive authentication demo that prompts for user credentials, obtains OAuth tokens from Keycloak, and tests access to various models based on role permissions. Shows which models each user role can access.
+Interactive authentication demo that prompts for user credentials, obtains OAuth tokens from Keycloak, and tests access to various resources based on role permissions. Demonstrates:
+
+o Model access across different providers (vLLM, OpenAI)
+o File operations (upload, list, delete)
+o Vector store operations (create, delete)
+o Vector store file attachments (end-to-end workflow)
 
 ## Development Notes
 
