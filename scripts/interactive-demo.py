@@ -2,24 +2,11 @@
 """
 Interactive LlamaStack Authentication Demo
 
-This script demonstrates multi-attribute access control with roles and teams:
-- user: Read-only access to free/shared models (vLLM, embedding models)
-- developer: Read models + CREATE vector stores and files
-- admin: Full access to all resources
-
-Team-based access control:
-- Vector stores: Developers CREATE, teams READ/DELETE via "user in owners teams"
-- developer (ml-team) creates vector store → developer2 (ml-team) can access
-- developer3 (data-team) CANNOT access ml-team vector stores
-
-Demonstrates RBAC and team-based access using only the OpenAI Python client.
+Demonstrates RBAC with roles (user/developer/admin) and team-based access control.
+Uses the OpenAI Python client to test access to models, files, and vector stores.
 
 Usage:
     python interactive-demo.py [--llamastack-url URL] [--keycloak-url URL]
-
-Environment Variables:
-    LLAMASTACK_URL: LlamaStack server URL
-    KEYCLOAK_URL: Keycloak base URL
 """
 
 import os
@@ -29,12 +16,11 @@ import argparse
 import requests
 import urllib3
 import httpx
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 import getpass
 import time
 from openai import OpenAI
 
-# Disable SSL warnings for demo purposes
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class InteractiveLlamaStackDemo:
@@ -46,13 +32,11 @@ class InteractiveLlamaStackDemo:
         self.token = None
         self.openai_client = None
 
-        # Models to test
         self.models_to_test = [
-            {"id": "vllm-inference/llama-3-2-3b", "name": "vLLM Llama 3.2 3B", "expected_roles": ["user", "developer", "admin"]},
-            {"id": "openai/gpt-4o-mini", "name": "OpenAI GPT-4o-mini", "expected_roles": ["developer", "admin"]},
-            {"id": "openai/gpt-4o", "name": "OpenAI GPT-4o", "expected_roles": ["admin"]}
+            {"id": "vllm-inference/llama-3-2-3b", "name": "vLLM Llama 3.2 3B"},
+            {"id": "openai/gpt-4o-mini", "name": "OpenAI GPT-4o-mini"},
+            {"id": "openai/gpt-4o", "name": "OpenAI GPT-4o"}
         ]
-
         self.embedding_model = "sentence-transformers/ibm-granite/granite-embedding-125m-english"
 
     def get_user_credentials(self) -> tuple[str, str]:
@@ -61,6 +45,21 @@ class InteractiveLlamaStackDemo:
         username = input("Username: ").strip()
         password = getpass.getpass("Password: ")
         return username, password
+
+    def _handle_operation(self, operation: Callable, operation_name: str, success_msg: str = None) -> bool:
+        """Common error handler for API operations"""
+        try:
+            operation()
+            msg = success_msg or f"{operation_name}: Access granted"
+            print(f"   o {msg}")
+            return True
+        except Exception as e:
+            error_str = str(e)
+            if "403" in error_str or "Forbidden" in error_str:
+                print(f"   o {operation_name}: Access denied (403)")
+            else:
+                print(f"   o {operation_name}: Error - {e}")
+            return False
 
     def get_token(self, username: str, password: str, client_secret: str) -> Optional[str]:
         """Get OAuth token from Keycloak"""
@@ -161,84 +160,53 @@ class InteractiveLlamaStackDemo:
                 messages=[{"role": "user", "content": "Say Hi!!!"}],
                 max_tokens=10
             )
-
             print(f"   ? {model_name}: Access granted")
-            if response.choices and len(response.choices) > 0:
-                content = response.choices[0].message.content
-                print(f"      Response: {content}")
+            if response.choices:
+                print(f"      Response: {response.choices[0].message.content}")
             return True
         except Exception as e:
-            error_str = str(e)
-            if "403" in error_str or "Forbidden" in error_str:
-                print(f"   ? {model_name}: Access denied (403)")
-                return False
-            else:
-                print(f"   ? {model_name}: Error - {e}")
-                return False
+            status = "Access denied (403)" if "403" in str(e) or "Forbidden" in str(e) else f"Error - {e}"
+            print(f"   ? {model_name}: {status}")
+            return False
 
     def test_models(self):
         """Test access to all models"""
         print("\n   Testing model access...")
         print("=" * 50)
-
-        results = []
-        for model in self.models_to_test:
-            success = self.test_model(model['id'], model['name'])
-            results.append((model['name'], success))
-
-        return results
+        return [(m['name'], self.test_model(m['id'], m['name'])) for m in self.models_to_test]
 
     def test_file_operations(self) -> tuple[dict, Optional[str]]:
-        """Test file upload and list operations (keeps file for vector store test)"""
+        """Test file upload and list operations"""
         print("\n   Testing file operations...")
         print("=" * 50)
 
-        results = {
-            'upload': False,
-            'list': False,
-        }
-
+        results = {'upload': False, 'list': False}
         file_id = None
-        test_content = f"Sample document for RBAC testing - {int(time.time())}"
 
         # Test UPLOAD
+        import io
         try:
-            import io
             file_obj = self.openai_client.files.create(
-                file=("test-rbac.txt", io.BytesIO(test_content.encode())),
+                file=("test-rbac.txt", io.BytesIO(f"RBAC test - {int(time.time())}".encode())),
                 purpose="assistants"
             )
             file_id = file_obj.id
             print(f"   o File Upload: Access granted (ID: {file_id})")
             results['upload'] = True
-
         except Exception as e:
-            error_str = str(e)
-            if "403" in error_str or "Forbidden" in error_str:
-                print(f"   o File Upload: Access denied (403)")
-            else:
-                print(f"   o File Upload: Error - {e}")
-            results['upload'] = False
-
+            status = "Access denied (403)" if "403" in str(e) or "Forbidden" in str(e) else f"Error - {e}"
+            print(f"   o File Upload: {status}")
+        
         # Test LIST
-        try:
-            files_list = self.openai_client.files.list()
-            print(f"   o File List: Access granted")
-            results['list'] = True
+        results['list'] = self._handle_operation(
+            lambda: self.openai_client.files.list(),
+            "File List"
+        )
 
-        except Exception as e:
-            error_str = str(e)
-            if "403" in error_str or "Forbidden" in error_str:
-                print(f"   o File List: Access denied (403)")
-            else:
-                print(f"   o File List: Error - {e}")
-            results['list'] = False
-
-        # Note: File will be kept for vector store attachment test
         return results, file_id
 
     def cleanup_test_file(self, file_id: Optional[str]) -> bool:
-        """Test file delete operation (cleanup after tests)"""
+        """Test file delete operation"""
         print("\n   Testing file cleanup...")
         print("=" * 50)
 
@@ -246,90 +214,49 @@ class InteractiveLlamaStackDemo:
             print(f"   o File Delete: Skipped (no file to delete)")
             return False
 
-        try:
-            self.openai_client.files.delete(file_id)
-            print(f"   o File Delete: Access granted")
-            return True
-
-        except Exception as e:
-            error_str = str(e)
-            if "403" in error_str or "Forbidden" in error_str:
-                print(f"   o File Delete: Access denied (403)")
-            else:
-                print(f"   o File Delete: Error - {e}")
-            return False
+        return self._handle_operation(
+            lambda: self.openai_client.files.delete(file_id),
+            "File Delete"
+        )
 
     def test_vector_store_operations(self, user_roles: list, test_file_id: Optional[str] = None) -> dict:
         """Test vector store create/delete operations and file attachments"""
         print("\n   Testing vector store operations...")
         print("=" * 50)
 
-        results = {
-            'create': False,
-            'delete': False,
-            'attach_file': False,
-        }
-
-        test_store_name = f"demo-test-store-{int(time.time())}"
+        results = {'create': False, 'delete': False, 'attach_file': False}
         vector_store_id = None
 
         # Test CREATE
         try:
-            vector_store = self.openai_client.vector_stores.create(
-                name=test_store_name,
+            store = self.openai_client.vector_stores.create(
+                name=f"demo-test-store-{int(time.time())}",
                 extra_body={"embedding_model": self.embedding_model}
             )
-
-            vector_store_id = vector_store.id
+            vector_store_id = store.id
             print(f"   o Vector Store Create: Access granted (ID: {vector_store_id})")
             results['create'] = True
-
         except Exception as e:
-            error_str = str(e)
-            if "403" in error_str or "Forbidden" in error_str:
-                print(f"   o Vector Store Create: Access denied (403)")
-                results['create'] = False
-            else:
-                print(f"   o Vector Store Create: Error - {e}")
-                results['create'] = False
+            status = "Access denied (403)" if "403" in str(e) or "Forbidden" in str(e) else f"Error - {e}"
+            print(f"   o Vector Store Create: {status}")
 
-        # Test FILE ATTACHMENT (only if create succeeded and we have a file)
+        # Test FILE ATTACHMENT
         if results['create'] and vector_store_id and test_file_id:
-            try:
-                vs_file = self.openai_client.vector_stores.files.create(
-                    vector_store_id=vector_store_id,
-                    file_id=test_file_id
-                )
-                print(f"   o Vector Store Attach File: Access granted")
-                results['attach_file'] = True
-
-            except Exception as e:
-                error_str = str(e)
-                if "403" in error_str or "Forbidden" in error_str:
-                    print(f"   o Vector Store Attach File: Access denied (403)")
-                elif "not found" in error_str.lower():
-                    print(f"   o Vector Store Attach File: File not found (already deleted)")
-                else:
-                    print(f"   o Vector Store Attach File: Error - {e}")
-                results['attach_file'] = False
+            results['attach_file'] = self._handle_operation(
+                lambda: self.openai_client.vector_stores.files.create(
+                    vector_store_id=vector_store_id, file_id=test_file_id
+                ),
+                "Vector Store Attach File"
+            )
         elif not test_file_id:
             print(f"   o Vector Store Attach File: Skipped (no file available)")
 
-        # Test DELETE (only if create succeeded)
+        # Test DELETE
         if results['create'] and vector_store_id:
-            try:
-                self.openai_client.vector_stores.delete(vector_store_id=vector_store_id)
-                print(f"   o Vector Store Delete: Access granted")
-                results['delete'] = True
-
-            except Exception as e:
-                error_str = str(e)
-                if "403" in error_str or "Forbidden" in error_str:
-                    print(f"   o Vector Store Delete: Access denied (403)")
-                    results['delete'] = False
-                else:
-                    print(f"   o Vector Store Delete: Error - {e}")
-                    results['delete'] = False
+            results['delete'] = self._handle_operation(
+                lambda: self.openai_client.vector_stores.delete(vector_store_id=vector_store_id),
+                "Vector Store Delete"
+            )
 
         return results
 
@@ -421,40 +348,25 @@ class InteractiveLlamaStackDemo:
         print("\n   Testing responses with MCP tools...")
         print("=" * 50)
 
-        results = {
-            'responses_with_mcp': False,
-        }
+        results = {'responses_with_mcp': False}
 
-        # Test responses.create with MCP server
-        try:
+        def call_mcp():
             response = self.openai_client.responses.create(
                 model="vllm-inference/llama-3-2-3b",
-                tools=[
-                    {
-                        "type": "mcp",
-                        "server_label": "deepwiki",
-                        "server_description": "DeepWiki MCP server for wiki queries",
-                        "server_url": "https://mcp.deepwiki.com/mcp",
-                        "require_approval": "never",
-                    }
-                ],
+                tools=[{
+                    "type": "mcp",
+                    "server_label": "deepwiki",
+                    "server_description": "DeepWiki MCP server for wiki queries",
+                    "server_url": "https://mcp.deepwiki.com/mcp",
+                    "require_approval": "never",
+                }],
                 input="What version of python is used in the llamastack/llama-stack project, be brief and to the point? Make sure to use the deepwiki ask_question tool to answer the question.",
                 stream=False,
             )
-
-            print(f"   o Responses with MCP Tools: Access granted")
             if hasattr(response, 'output_text') and response.output_text:
                 print(f"      Response: {response.output_text[:100]}...")
-            results['responses_with_mcp'] = True
 
-        except Exception as e:
-            error_str = str(e)
-            if "403" in error_str or "Forbidden" in error_str:
-                print(f"   o Responses with MCP Tools: Access denied (403)")
-            else:
-                print(f"   o Responses with MCP Tools: Error - {e}")
-            results['responses_with_mcp'] = False
-
+        results['responses_with_mcp'] = self._handle_operation(call_mcp, "Responses with MCP Tools")
         return results
 
 
@@ -470,7 +382,6 @@ class InteractiveLlamaStackDemo:
 
         # Get token
         self.token = self.get_token(username, password, client_secret)
-        open("token-"+username, "w").write(self.token or "")
         if not self.token:
             return False
 
@@ -531,45 +442,32 @@ class InteractiveLlamaStackDemo:
         print("=" * 50)
         print(f"User Roles: {user_roles}")
         print(f"User Teams: {user_teams}")
-        print(f"\nModel Access:")
-        for model_name, success in model_results:
-            status = "ALLOWED" if success else "DENIED"
-            print(f"  {status:8} - {model_name}")
-
-        print(f"\nFile Operations:")
-        for op, success in file_results.items():
-            status = "ALLOWED" if success else "DENIED"
-            print(f"  {status:8} - {op.capitalize()}")
-
-        print(f"\nVector Store Operations:")
-        for op, success in vector_results.items():
-            status = "ALLOWED" if success else "DENIED"
-            op_name = op.replace('_', ' ').capitalize()
-            print(f"  {status:8} - {op_name}")
-
+        
+        def print_results(title: str, results):
+            print(f"\n{title}:")
+            if isinstance(results, list):
+                for name, success in results:
+                    print(f"  {'ALLOWED' if success else 'DENIED':8} - {name}")
+            else:
+                for op, success in results.items():
+                    op_name = op.replace('_', ' ').capitalize()
+                    print(f"  {'ALLOWED' if success else 'DENIED':8} - {op_name}")
+        
+        print_results("Model Access", model_results)
+        print_results("File Operations", file_results)
+        print_results("Vector Store Operations", vector_results)
+        
         print(f"\nTeam-Based Vector Store (vs_mlteam_team):")
         if team_create_results.get('created'):
             print(f"  CREATED    - Persistent team vector store (developer only)")
-            if team_create_results.get('file_added'):
-                print(f"  FILE ADDED - Sample file attached to vector store")
         elif team_create_results.get('already_exists'):
             print(f"  EXISTS     - Team vector store already present")
         
         if team_access_results:
-            can_list = team_access_results.get('can_access', False)
-            can_retrieve = team_access_results.get('can_retrieve', False)
-            can_list_files = team_access_results.get('can_list_files', False)
-            list_status = "YES" if can_list else "NO"
-            retrieve_status = "YES" if can_retrieve else "NO"
-            files_status = "YES" if can_list_files else "NO"
-            print(f"  List Store:  {list_status:3} - Can see in list()")
-
-        print(f"\nMCP Operations:")
-        for op, success in mcp_results.items():
-            status = "ALLOWED" if success else "DENIED"
-            op_name = op.replace('_', ' ').capitalize()
-            print(f"  {status:8} - {op_name}")
-
+            can_list = "YES" if team_access_results.get('can_access', False) else "NO"
+            print(f"  List Store:  {can_list:3} - Can see in list()")
+        
+        print_results("MCP Operations", mcp_results)
         print("\n" + "=" * 50)
 
 def main():
