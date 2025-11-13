@@ -370,7 +370,7 @@ class InteractiveLlamaStackDemo:
         return results
 
 
-    def run_demo(self, client_secret: str) -> bool:
+    def run_demo(self, client_secret: str, skip_mcp: bool = False) -> bool:
         """Run the interactive demo"""
         print("=" * 50)
         print(f"LlamaStack URL: {self.llamastack_url}")
@@ -424,7 +424,7 @@ class InteractiveLlamaStackDemo:
         team_access_results = self.test_access_to_team_vector_store(username, user_teams)
 
         # Test responses API with MCP tools
-        mcp_results = self.test_responses_with_mcp()
+        mcp_results = {} if skip_mcp else self.test_responses_with_mcp()
 
         # Cleanup: test file delete
         file_delete_result = self.cleanup_test_file(test_file_id)
@@ -467,7 +467,8 @@ class InteractiveLlamaStackDemo:
             can_list = "YES" if team_access_results.get('can_access', False) else "NO"
             print(f"  List Store:  {can_list:3} - Can see in list()")
 
-        print_results("MCP Operations", mcp_results)
+        if mcp_results:
+            print_results("MCP Operations", mcp_results)
         print("\n" + "=" * 50)
 
 def main():
@@ -481,6 +482,9 @@ def main():
     parser.add_argument("--client-secret",
                        default=os.getenv("KEYCLOAK_CLIENT_SECRET"),
                        help="Keycloak client secret")
+    parser.add_argument("--skip-mcp",
+                       action="store_true",
+                       help="Skip MCP test")
 
     args = parser.parse_args()
 
@@ -490,7 +494,7 @@ def main():
         sys.exit(1)
 
     demo = InteractiveLlamaStackDemo(args.llamastack_url, args.keycloak_url)
-    success = demo.run_demo(args.client_secret)
+    success = demo.run_demo(args.client_secret, skip_mcp=args.skip_mcp)
 
     sys.exit(0 if success else 1)
 
