@@ -60,7 +60,7 @@ The demo showcases LlamaStack's multi-attribute access control, supporting:
    ```bash
    oc port-forward $(oc get pods -l application=kc -o name | head -n1) 8080:8080
    ```
-   Navigate to http://localhost:8080 in your browser, log in with the Keycloak admin credentials, and update the Frontend URL to match `$KEYCLOAK_URL` (In Realm settings). 
+   Navigate to http://localhost:8080 in your browser, log in with the Keycloak admin credentials, and update the Frontend URL to match `$KEYCLOAK_URL` (In Realm settings).
 
 3. **Configure Keycloak**:
    ```bash
@@ -90,8 +90,8 @@ The demo showcases LlamaStack's multi-attribute access control, supporting:
    - `developer2` / `dev223` (role: developer, team: ml-team - same as developer)
    - `developer3` / `dev323` (role: developer, team: data-team - different team)
    - `user` / `user123` (role: user, team: data-team - vllm model only)
-   
-   **Team-Based Access Demo**: 
+
+   **Team-Based Access Demo**:
    - When logged in as `developer`, the demo creates a persistent vector store named `vs_mlteam_team` with a sample file attached
    - On every demo run (any user), the demo tests access to this vector store by:
      - **List access**: Can the user see it in `vector_stores.list()`?
@@ -115,7 +115,7 @@ LlamaStack supports multiple attribute categories for fine-grained access contro
 - **projects**: Project-based access (not used in this demo)
 - **namespaces**: Namespace-based access (not used in this demo)
 
-Resources are accessible when users match the resource owner's attributes. The default policy requires users to have matching values in ALL attribute categories that exist on the resource. 
+Resources are accessible when users match the resource owner's attributes. The default policy requires users to have matching values in ALL attribute categories that exist on the resource.
 
 **This demo demonstrates both:**
 1. **Role-based rules**: Explicit permissions based on user roles (e.g., "user with developer in roles")

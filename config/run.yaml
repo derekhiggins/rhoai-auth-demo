@@ -240,7 +240,7 @@ server:
     access_policy:
       # For example, if user "developer" (teams: [ml-team]) creates a vector store,
       # another user with teams: [ml-team] can access it via the default policy.
-      
+
       # EXPLICIT RULES:
       # User role: read-only access to in-house models
       - permit:
@@ -286,7 +286,7 @@ server:
           actions: [create, read, delete]
         when: user with admin in roles
         description: Admins have full access to all resources
-      
+
       # TEAM-BASED ACCESS EXAMPLES:
       # The following rules demonstrate explicit team-based access control
       - permit:

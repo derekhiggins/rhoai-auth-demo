@@ -31,7 +31,7 @@ spec:
         # Keycloak Configuration
         - name: KEYCLOAK_VERIFY_TLS
           value: "${KEYCLOAK_VERIFY_TLS}"
-        
+
         # Telemetry Configuration
         - name: OTEL_SERVICE_NAME
           value: "${OTEL_SERVICE_NAME}"

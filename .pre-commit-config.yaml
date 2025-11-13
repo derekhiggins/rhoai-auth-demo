@@ -1,0 +1,11 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Fix trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of file
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: ['--fix=lf']
