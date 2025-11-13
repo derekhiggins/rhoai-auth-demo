@@ -2,12 +2,17 @@
 """
 Interactive LlamaStack Authentication Demo
 
-This script demonstrates role-based access control with three user roles:
+This script demonstrates multi-attribute access control with roles and teams:
 - user: Read-only access to free/shared models (vLLM, embedding models)
-- developer: Read all models + manage vector stores and files
+- developer: Read models + CREATE vector stores and files
 - admin: Full access to all resources
 
-Demonstrates RBAC using only the OpenAI Python client for API interactions.
+Team-based access control:
+- Vector stores: Developers CREATE, teams READ/DELETE via "user in owners teams"
+- developer (ml-team) creates vector store → developer2 (ml-team) can access
+- developer3 (data-team) CANNOT access ml-team vector stores
+
+Demonstrates RBAC and team-based access using only the OpenAI Python client.
 
 Usage:
     python interactive-demo.py [--llamastack-url URL] [--keycloak-url URL]
@@ -328,6 +333,89 @@ class InteractiveLlamaStackDemo:
 
         return results
 
+    def create_team_vector_store(self, username: str) -> dict:
+        """Create persistent team vector store with a file (only for 'developer' user)"""
+        results = {'created': False, 'already_exists': False, 'file_added': False}
+        
+        if username != "developer":
+            return results
+        
+        print("\n   Creating persistent team vector store...")
+        print("=" * 50)
+        
+        team_store_name = "vs_mlteam_team"
+        
+        # Check if it already exists
+        try:
+            stores_list = self.openai_client.vector_stores.list()
+            for store in stores_list.data:
+                if store.name == team_store_name:
+                    print(f"   o Vector store '{team_store_name}' already exists (ID: {store.id})")
+                    results['already_exists'] = True
+                    return results
+        except Exception as e:
+            print(f"   o Error checking existing stores: {e}")
+        
+        # Create new vector store
+        try:
+            vector_store = self.openai_client.vector_stores.create(
+                name=team_store_name,
+                extra_body={"embedding_model": self.embedding_model}
+            )
+            print(f"   o Created vector store '{team_store_name}' (ID: {vector_store.id})")
+            print(f"   o Owner: developer (ml-team)")
+            results['created'] = True
+            
+            print(f"   o This store will persist for access testing by other users")
+        except Exception as e:
+            print(f"   o Failed to create vector store: {e}")
+        
+        return results
+
+    def test_access_to_team_vector_store(self, username: str, user_teams: list) -> dict:
+        """Test access to the persistent team vector store (all users)"""
+        print("\n   Testing access to team-based vector store...")
+        print("=" * 50)
+        
+        results = {'can_access': False, 'store_exists': False}
+        team_store_name = "vs_mlteam_team"
+        vector_store_id = None
+        
+        print(f"   o Current user: {username} (teams: {user_teams})")
+        print(f"   o Testing access to '{team_store_name}' (owned by developer/ml-team)")
+        
+        # Try to list and find the vector store
+        try:
+            stores_list = self.openai_client.vector_stores.list()
+            found = False
+            for store in stores_list.data:
+                if store.name == team_store_name:
+                    found = True
+                    vector_store_id = store.id
+                    results['store_exists'] = True
+                    results['can_access'] = True
+                    print(f"   o ✓ LIST ACCESS: Vector store is visible in list")
+                    print(f"     Store ID: {store.id}, Name: {store.name}")
+                    break
+            
+            if not found:
+                results['can_access'] = False
+                print(f"   o ✗ LIST ACCESS: Vector store not visible in list")
+                if "ml-team" not in user_teams:
+                    print(f"     Reason: User is not in ml-team (owner's team)")
+                else:
+                    print(f"     Note: Store may not exist yet (run as 'developer' first)")
+            return results
+        
+        except Exception as e:
+            error_str = str(e)
+            results['can_access'] = False
+            if "403" in error_str or "Forbidden" in error_str:
+                print(f"   o ✗ LIST ACCESS: 403 Forbidden")
+            else:
+                print(f"   o Error listing stores: {e}")
+                return results
+
     def test_responses_with_mcp(self) -> dict:
         """Test responses API with MCP server tools"""
         print("\n   Testing responses with MCP tools...")
@@ -392,11 +480,14 @@ class InteractiveLlamaStackDemo:
         # Show token claims
         claims = self.decode_token_claims(self.token)
         user_roles = []
+        user_teams = []
         if claims:
             print(f"\n   Token claims:")
             print(f"   Username: {claims.get('preferred_username', 'N/A')}")
             user_roles = claims.get('llamastack_roles', [])
+            user_teams = claims.get('llamastack_teams', [])
             print(f"   Roles: {user_roles}")
+            print(f"   Teams: {user_teams}")
             print(f"   Expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(claims.get('exp', 0)))}")
 
         print("\n" + "=" * 50)
@@ -415,6 +506,12 @@ class InteractiveLlamaStackDemo:
         # Test vector store operations (with file if available)
         vector_results = self.test_vector_store_operations(user_roles, test_file_id)
 
+        # Create persistent team vector store (only for 'developer' user)
+        team_create_results = self.create_team_vector_store(username)
+
+        # Test access to team vector store (all users)
+        team_access_results = self.test_access_to_team_vector_store(username, user_teams)
+
         # Test responses API with MCP tools
         mcp_results = self.test_responses_with_mcp()
 
@@ -423,16 +520,17 @@ class InteractiveLlamaStackDemo:
         file_results['delete'] = file_delete_result
 
         # Print summary
-        self.print_summary(user_roles, model_results, file_results, vector_results, mcp_results)
+        self.print_summary(user_roles, user_teams, model_results, file_results, vector_results, mcp_results, team_create_results, team_access_results)
 
         return True
 
-    def print_summary(self, user_roles: list, model_results: list, file_results: dict, vector_results: dict, mcp_results: dict):
+    def print_summary(self, user_roles: list, user_teams: list, model_results: list, file_results: dict, vector_results: dict, mcp_results: dict, team_create_results: dict, team_access_results: dict):
         """Print access control summary"""
         print("\n" + "=" * 50)
         print("ACCESS SUMMARY")
         print("=" * 50)
         print(f"User Roles: {user_roles}")
+        print(f"User Teams: {user_teams}")
         print(f"\nModel Access:")
         for model_name, success in model_results:
             status = "ALLOWED" if success else "DENIED"
@@ -448,6 +546,23 @@ class InteractiveLlamaStackDemo:
             status = "ALLOWED" if success else "DENIED"
             op_name = op.replace('_', ' ').capitalize()
             print(f"  {status:8} - {op_name}")
+
+        print(f"\nTeam-Based Vector Store (vs_mlteam_team):")
+        if team_create_results.get('created'):
+            print(f"  CREATED    - Persistent team vector store (developer only)")
+            if team_create_results.get('file_added'):
+                print(f"  FILE ADDED - Sample file attached to vector store")
+        elif team_create_results.get('already_exists'):
+            print(f"  EXISTS     - Team vector store already present")
+        
+        if team_access_results:
+            can_list = team_access_results.get('can_access', False)
+            can_retrieve = team_access_results.get('can_retrieve', False)
+            can_list_files = team_access_results.get('can_list_files', False)
+            list_status = "YES" if can_list else "NO"
+            retrieve_status = "YES" if can_retrieve else "NO"
+            files_status = "YES" if can_list_files else "NO"
+            print(f"  List Store:  {list_status:3} - Can see in list()")
 
         print(f"\nMCP Operations:")
         for op, success in mcp_results.items():

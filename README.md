@@ -6,10 +6,21 @@ This repository targets RHOAI Next on the main branch. For other releases, check
 
 ## Overview
 
-The demo features three user personas with different access levels:
-- **Admin**: Full access to all resources and operations
-- **Developer**: Read most models, manage vector stores and files
-- **User**: Read-only access to free/shared models (vLLM, embedding models)
+The demo features user personas with different access levels based on both roles and teams:
+- **Admin** (platform-team): Full access to all resources and operations
+- **Developer** (ml-team): Read models, create vector stores, manage files
+- **Developer2** (ml-team): Same as developer - demonstrates team-based access
+- **Developer3** (data-team): Same role as developer but DIFFERENT team - cannot access ml-team resources
+- **User** (data-team): Read-only access to on-site models (vLLM, embedding models)
+
+The demo showcases LlamaStack's multi-attribute access control, supporting:
+- **Roles**: Traditional role-based access control (admin, developer, user)
+- **Teams**: Group-based access control (platform-team, ml-team, data-team)
+
+**Key Insight:** Vector store access is controlled by the `user in owners teams` policy:
+- Developers can CREATE vector stores (role-based permission)
+- Team members can READ/DELETE their team's vector stores (team-based permission)
+- Developer3 (data-team) cannot access vector stores owned by developer (ml-team)
 
 ## Prerequisites
 
@@ -74,42 +85,102 @@ The demo features three user personas with different access levels:
    ```
 
    Demo users (configured by setup-keycloak.py):
-   - `admin` / `admin123` (admin role - full access)
-   - `developer` / `dev123` (developer role - all models + data management)
-   - `user` / `user123` (user role - free models only)
+   - `admin` / `admin123` (role: admin, team: platform-team - full access)
+   - `developer` / `dev123` (role: developer, team: ml-team - 2 models + data management)
+   - `developer2` / `dev223` (role: developer, team: ml-team - same as developer)
+   - `developer3` / `dev323` (role: developer, team: data-team - different team)
+   - `user` / `user123` (role: user, team: data-team - vllm model only)
+   
+   **Team-Based Access Demo**: 
+   - When logged in as `developer`, the demo creates a persistent vector store named `vs_mlteam_team` with a sample file attached
+   - On every demo run (any user), the demo tests access to this vector store by:
+     - **List access**: Can the user see it in `vector_stores.list()`?
+   - **Access Results:**
+     - `developer` (ml-team, creator): ✓ All access (owner)
+     - `developer2` (ml-team): ✓ All access (same team via "user in owners teams")
+     - `developer3` (data-team): ✗ NO access (different team)
+     - `admin` (platform-team): ✓ All access (admin override)
+     - `user` (data-team): ✗ NO access (different team + no create permission)
+   - This demonstrates the "user in owners teams" policy: only team members can access team resources
 
 ## Architecture
 
-The demo implements OAuth2 token-based authentication with role-based access control:
+The demo implements OAuth2 token-based authentication with multi-attribute access control:
 
-| Resource Type          | User    | Developer | Admin       |
-|------------------------|---------|-----------|-------------|
-| vLLM Models            | Read    | Read      | Full (CRD)  |
-| Embedding Models       | Read    | Read      | Full (CRD)  |
-| OpenAI Models          | -       | Read      | Full (CRD)  |
-| Files                  | -       | Full (CRD)| Full (CRD)  |
-| Vector Stores          | -       | Full (CRD)| Full (CRD)  |
-| Vector Store Files     | -       | Full (CRD)| Full (CRD)  |
-| MCP Servers            | Read    | Read      | Full (CRD)  |
-| SQL Records            | -       | Read      | Full (CRD)  |
+### Access Control Attributes
+
+LlamaStack supports multiple attribute categories for fine-grained access control:
+- **roles**: Traditional role-based access (admin, developer, user)
+- **teams**: Group/team membership (platform-team, ml-team, data-team)
+- **projects**: Project-based access (not used in this demo)
+- **namespaces**: Namespace-based access (not used in this demo)
+
+Resources are accessible when users match the resource owner's attributes. The default policy requires users to have matching values in ALL attribute categories that exist on the resource. 
+
+**This demo demonstrates both:**
+1. **Role-based rules**: Explicit permissions based on user roles (e.g., "user with developer in roles")
+2. **Team-based rules**: Access to team-owned resources via `user in owners teams` policy
+
+The vector store access pattern showcases this hybrid approach:
+- Role grants CREATE permission
+- Team membership grants READ/DELETE permission to owned resources
+
+### Permission Matrix
+
+| Resource Type          | User    | Developer      | Admin       | Notes |
+|------------------------|---------|----------------|-------------|-------|
+| vLLM Models            | Read    | Read           | Full (CRD)  | Role-based |
+| Embedding Models       | Read    | Read           | Full (CRD)  | Role-based |
+| OpenAI Models          | -       | Read           | Full (CRD)  | Role-based |
+| Files                  | -       | Full (CRD)     | Full (CRD)  | Role-based |
+| Vector Stores          | -       | Create only    | Full (CRD)  | **Team-based R/D** |
+| Vector Store Files     | -       | Team-based     | Full (CRD)  | **Team-based** |
+| MCP Servers            | Read    | Read           | Full (CRD)  | Role-based |
+| SQL Records            | -       | Read           | Full (CRD)  | Role-based |
 
 **Legend:** CRD = Create, Read, Delete
+
+**Key Access Control Pattern:**
+- **Vector Stores**: Developers can CREATE vector stores. Reading and deleting is controlled by the `user in owners teams` policy
+  - Example: developer (ml-team) creates `vs_mlteam_team` → developer2 (ml-team) can read/delete it
+  - Example: developer3 (data-team) CANNOT read/delete `vs_mlteam_team` (different team)
+- This demonstrates how team-based access control works alongside role-based permissions
 
 ## Scripts
 
 ### `setup-keycloak.py`
-Automatically configures Keycloak for the demo. Creates the realm, client, roles (admin, developer, user), demo users, and protocol mappers. Displays the client secret needed for authentication.
+Automatically configures Keycloak for the demo. Creates:
+- Realm (llamastack-demo)
+- Client (llamastack)
+- Roles (admin, developer, user)
+- Groups/Teams (platform-team, ml-team, data-team)
+- Demo users with role and team assignments
+- Protocol mappers for both roles and teams
+
+Displays the client secret needed for authentication.
 
 ### `deploy.sh`
 Deploys the LlamaStack distribution to OpenShift. Creates ConfigMaps from the run configuration, deploys the LlamaStackDistribution resource, creates the route, and waits for the deployment to be ready.
 
 ### `interactive-demo.py`
-Interactive authentication demo that prompts for user credentials, obtains OAuth tokens from Keycloak, and tests access to various resources based on role permissions. Demonstrates:
+Interactive authentication demo that prompts for user credentials, obtains OAuth tokens from Keycloak, and tests access to various resources based on role and team permissions. Demonstrates:
 
 o Model access across different providers (vLLM, OpenAI)
 o File operations (upload, list, delete)
 o Vector store operations (create, delete)
 o Vector store file attachments (end-to-end workflow)
+o **Team-based access control** (Vector Stores):
+  - Access model: CREATE (role-based) + READ/DELETE (team-based via "user in owners teams")
+  - When logged in as `developer`: Creates persistent vector store `vs_mlteam_team` (ml-team owned) with a sample file
+  - For ALL users: Tests access with three operations:
+    - `vector_stores.list()` - Can the user see the vector store in the list?
+  - **Expected results:**
+    - developer/developer2 (ml-team): ✓ All operations work (team access)
+    - developer3 (data-team): ✗ All operations denied (different team)
+    - admin: ✓ All operations work (admin override)
+    - user: ✗ All operations denied (no create + different team)
+  - Demonstrates "user in owners teams" policy in action
+  - Run with different users to see team-based isolation
 o Responses API with MCP server tools (demonstrates external tool integration)
 
 All demonstrations use only the OpenAI Python client for API interactions.

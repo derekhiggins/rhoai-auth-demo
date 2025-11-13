@@ -236,7 +236,12 @@ server:
       verify_tls: ${env.KEYCLOAK_VERIFY_TLS:=false}
       claims_mapping:
         llamastack_roles: "roles"
+        llamastack_teams: "teams"
     access_policy:
+      # For example, if user "developer" (teams: [ml-team]) creates a vector store,
+      # another user with teams: [ml-team] can access it via the default policy.
+      
+      # EXPLICIT RULES:
       # User role: read-only access to in-house models
       - permit:
           actions: [read]
@@ -266,7 +271,7 @@ server:
         when: user with developer in roles
         description: Developers can read embedding models
       - permit:
-          actions: [create, read, delete]
+          actions: [create]
           resource: vector_store::*
         when: user with developer in roles
         description: Developers can manage vector stores
@@ -281,3 +286,11 @@ server:
           actions: [create, read, delete]
         when: user with admin in roles
         description: Admins have full access to all resources
+      
+      # TEAM-BASED ACCESS EXAMPLES:
+      # The following rules demonstrate explicit team-based access control
+      - permit:
+          actions: [read, delete]
+          resource: vector_store::*
+        when: user in owners teams
+        description: Teams can access their own vector stores

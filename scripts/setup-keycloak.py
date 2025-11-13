@@ -180,11 +180,11 @@ class KeycloakSetup:
         
         return success
     
-    def create_protocol_mapper(self) -> bool:
-        """Create custom protocol mapper for LlamaStack roles"""
+    def create_protocol_mappers(self) -> bool:
+        """Create custom protocol mappers for LlamaStack roles and teams"""
         client_uuid = self.get_client_uuid()
         if not client_uuid:
-            print("✗ Cannot create protocol mapper: client not found")
+            print("✗ Cannot create protocol mappers: client not found")
             return False
             
         headers = {
@@ -192,7 +192,8 @@ class KeycloakSetup:
             'Content-Type': 'application/json'
         }
         
-        mapper_config = {
+        # Roles mapper
+        roles_mapper_config = {
             "name": "llamastack-roles",
             "protocol": "openid-connect",
             "protocolMapper": "oidc-usermodel-realm-role-mapper",
@@ -208,21 +209,96 @@ class KeycloakSetup:
             }
         }
         
-        url = f"{self.base_url}/admin/realms/{self.realm_name}/clients/{client_uuid}/protocol-mappers/models"
-        response = requests.post(url, headers=headers, json=mapper_config, verify=False)
+        # Teams mapper (using groups)
+        teams_mapper_config = {
+            "name": "llamastack-teams",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-group-membership-mapper",
+            "consentRequired": False,
+            "config": {
+                "full.path": "false",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "claim.name": "llamastack_teams",
+                "userinfo.token.claim": "true"
+            }
+        }
         
-        if response.status_code == 201:
-            print("✓ Created protocol mapper: llamastack-roles")
-            return True
-        elif response.status_code == 409:
-            print("✓ Protocol mapper llamastack-roles already exists")
-            return True
-        else:
-            print(f"✗ Failed to create protocol mapper: {response.text}")
-            return False
+        url = f"{self.base_url}/admin/realms/{self.realm_name}/clients/{client_uuid}/protocol-mappers/models"
+        
+        success = True
+        for mapper_config in [roles_mapper_config, teams_mapper_config]:
+            response = requests.post(url, headers=headers, json=mapper_config, verify=False)
+            
+            if response.status_code == 201:
+                print(f"✓ Created protocol mapper: {mapper_config['name']}")
+            elif response.status_code == 409:
+                print(f"✓ Protocol mapper {mapper_config['name']} already exists")
+            else:
+                print(f"✗ Failed to create protocol mapper {mapper_config['name']}: {response.text}")
+                success = False
+        
+        return success
     
+    def create_groups(self) -> bool:
+        """Create groups (teams) for the demo"""
+        headers = {
+            'Authorization': f'Bearer {self.admin_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        groups = [
+            {"name": "platform-team", "path": "/platform-team"},
+            {"name": "ml-team", "path": "/ml-team"},
+            {"name": "data-team", "path": "/data-team"},
+        ]
+        
+        success = True
+        for group in groups:
+            url = f"{self.base_url}/admin/realms/{self.realm_name}/groups"
+            response = requests.post(url, headers=headers, json=group, verify=False)
+            
+            if response.status_code == 201:
+                print(f"✓ Created group: {group['name']}")
+            elif response.status_code == 409:
+                print(f"✓ Group {group['name']} already exists")
+            else:
+                print(f"✗ Failed to create group {group['name']}: {response.text}")
+                success = False
+        
+        return success
+    
+    def get_group_id(self, group_name: str) -> Optional[str]:
+        """Get group ID by name"""
+        headers = {
+            'Authorization': f'Bearer {self.admin_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        url = f"{self.base_url}/admin/realms/{self.realm_name}/groups"
+        response = requests.get(url, headers=headers, verify=False)
+        
+        if response.status_code == 200:
+            groups = response.json()
+            for group in groups:
+                if group['name'] == group_name:
+                    return group['id']
+        return None
+    
+    def assign_user_to_group(self, user_id: str, group_id: str) -> bool:
+        """Assign user to a group"""
+        headers = {
+            'Authorization': f'Bearer {self.admin_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        url = f"{self.base_url}/admin/realms/{self.realm_name}/users/{user_id}/groups/{group_id}"
+        response = requests.put(url, headers=headers, verify=False)
+        
+        return response.status_code == 204
+
     def create_users(self) -> bool:
-        """Create demo users with appropriate roles"""
+        """Create demo users with appropriate roles and teams"""
         headers = {
             'Authorization': f'Bearer {self.admin_token}',
             'Content-Type': 'application/json'
@@ -237,7 +313,8 @@ class KeycloakSetup:
                 "enabled": True,
                 "emailVerified": True,
                 "credentials": [{"type": "password", "value": "admin123", "temporary": False}],
-                "roles": ["admin"]
+                "roles": ["admin"],
+                "teams": ["platform-team"]
             },
             {
                 "username": "developer", 
@@ -247,7 +324,30 @@ class KeycloakSetup:
                 "enabled": True,
                 "emailVerified": True,
                 "credentials": [{"type": "password", "value": "dev123", "temporary": False}],
-                "roles": ["developer"]
+                "roles": ["developer"],
+                "teams": ["ml-team"]
+            },
+            {
+                "username": "developer2", 
+                "email": "developer2@example.com",
+                "firstName": "Developer Two",
+                "lastName": "User",
+                "enabled": True,
+                "emailVerified": True,
+                "credentials": [{"type": "password", "value": "dev123", "temporary": False}],
+                "roles": ["developer"],
+                "teams": ["ml-team"]
+            },
+            {
+                "username": "developer3", 
+                "email": "developer3@example.com",
+                "firstName": "Developer Three",
+                "lastName": "User",
+                "enabled": True,
+                "emailVerified": True,
+                "credentials": [{"type": "password", "value": "dev123", "temporary": False}],
+                "roles": ["developer"],
+                "teams": ["data-team"]
             },
             {
                 "username": "user",
@@ -257,24 +357,32 @@ class KeycloakSetup:
                 "enabled": True,
                 "emailVerified": True,
                 "credentials": [{"type": "password", "value": "user123", "temporary": False}],
-                "roles": ["user"]
+                "roles": ["user"],
+                "teams": ["data-team"]
             }
         ]
         
         success = True
         for user_data in users:
-            # Create user
+            # Extract roles and teams
             user_roles = user_data.pop("roles")
+            user_teams = user_data.pop("teams")
+            
+            # Create user
             url = f"{self.base_url}/admin/realms/{self.realm_name}/users"
             response = requests.post(url, headers=headers, json=user_data, verify=False)
             
             if response.status_code == 201:
                 print(f"✓ Created user: {user_data['username']}")
                 
-                # Get user ID and assign roles
+                # Get user ID and assign roles and teams
                 user_id = self.get_user_id(user_data['username'])
                 if user_id:
                     self.assign_user_roles(user_id, user_roles)
+                    for team in user_teams:
+                        group_id = self.get_group_id(team)
+                        if group_id:
+                            self.assign_user_to_group(user_id, group_id)
                     
             elif response.status_code == 409:
                 print(f"✓ User {user_data['username']} already exists")
@@ -341,7 +449,10 @@ class KeycloakSetup:
             if not self.create_roles():
                 return False
                 
-            if not self.create_protocol_mapper():
+            if not self.create_groups():
+                return False
+                
+            if not self.create_protocol_mappers():
                 return False
                 
             if not self.create_users():
@@ -359,9 +470,11 @@ class KeycloakSetup:
                 print(f"   Token Endpoint: {self.base_url}/realms/{self.realm_name}/protocol/openid-connect/token")
                 
                 print(f"\n👥 Demo Users:")
-                print(f"   admin / admin123 (admin role)")
-                print(f"   developer / dev123 (developer role)")
-                print(f"   user / user123 (user role)")
+                print(f"   admin / admin123 (role: admin, team: platform-team)")
+                print(f"   developer / dev123 (role: developer, team: ml-team)")
+                print(f"   developer2 / dev223 (role: developer, team: ml-team)")
+                print(f"   developer3 / dev323 (role: developer, team: data-team)")
+                print(f"   user / user123 (role: user, team: data-team)")
             
             print("\n✅ Keycloak setup completed successfully!")
             return True
