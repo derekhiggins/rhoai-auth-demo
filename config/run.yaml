@@ -294,3 +294,9 @@ server:
           resource: vector_store::*
         when: user in owners teams
         description: Teams can access their own vector stores
+
+      - permit:
+          actions: [read, delete]
+          resource: vector_store::*
+        when: user is owner
+        description: Teams can access their own vector stores
