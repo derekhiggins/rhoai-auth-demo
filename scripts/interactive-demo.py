@@ -370,7 +370,7 @@ class InteractiveLlamaStackDemo:
         return results
 
 
-    def run_demo(self, client_secret: str, skip_mcp: bool = False) -> bool:
+    def run_demo(self, client_secret: str, skip_mcp: bool = False, team_only: bool = False) -> bool:
         """Run the interactive demo"""
         print("=" * 50)
         print(f"LlamaStack URL: {self.llamastack_url}")
@@ -402,33 +402,44 @@ class InteractiveLlamaStackDemo:
             print(f"   Expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(claims.get('exp', 0)))}")
 
         print("\n" + "=" * 50)
-        print("ROLE-BASED ACCESS CONTROL TEST")
+        if team_only:
+            print("TEAM-BASED ACCESS CONTROL TEST")
+        else:
+            print("ROLE-BASED ACCESS CONTROL TEST")
         print("=" * 50)
 
-        # List models
-        self.list_models()
+        if team_only:
+            # Only run team tests
+            model_results = []
+            file_results = {}
+            vector_results = {}
+            mcp_results = {}
+            test_file_id = None
+        else:
+            # List models
+            self.list_models()
 
-        # Test all models
-        model_results = self.test_models()
+            # Test all models
+            model_results = self.test_models()
 
-        # Test file operations
-        file_results, test_file_id = self.test_file_operations()
+            # Test file operations
+            file_results, test_file_id = self.test_file_operations()
 
-        # Test vector store operations (with file if available)
-        vector_results = self.test_vector_store_operations(user_roles, test_file_id)
+            # Test vector store operations (with file if available)
+            vector_results = self.test_vector_store_operations(user_roles, test_file_id)
+
+            # Test responses API with MCP tools
+            mcp_results = {} if skip_mcp else self.test_responses_with_mcp()
+
+            # Cleanup: test file delete
+            file_delete_result = self.cleanup_test_file(test_file_id)
+            file_results['delete'] = file_delete_result
 
         # Create persistent team vector store (only for 'developer' user)
         team_create_results = self.create_team_vector_store(username)
 
         # Test access to team vector store (all users)
         team_access_results = self.test_access_to_team_vector_store(username, user_teams)
-
-        # Test responses API with MCP tools
-        mcp_results = {} if skip_mcp else self.test_responses_with_mcp()
-
-        # Cleanup: test file delete
-        file_delete_result = self.cleanup_test_file(test_file_id)
-        file_results['delete'] = file_delete_result
 
         # Print summary
         self.print_summary(user_roles, user_teams, model_results, file_results, vector_results, mcp_results, team_create_results, team_access_results)
@@ -453,9 +464,12 @@ class InteractiveLlamaStackDemo:
                     op_name = op.replace('_', ' ').capitalize()
                     print(f"  {'ALLOWED' if success else 'DENIED':8} - {op_name}")
 
-        print_results("Model Access", model_results)
-        print_results("File Operations", file_results)
-        print_results("Vector Store Operations", vector_results)
+        if model_results:
+            print_results("Model Access", model_results)
+        if file_results:
+            print_results("File Operations", file_results)
+        if vector_results:
+            print_results("Vector Store Operations", vector_results)
 
         print(f"\nTeam-Based Vector Store (vs_mlteam_team):")
         if team_create_results.get('created'):
@@ -485,6 +499,9 @@ def main():
     parser.add_argument("--skip-mcp",
                        action="store_true",
                        help="Skip MCP test")
+    parser.add_argument("--team-only",
+                       action="store_true",
+                       help="Only run team-based access tests")
 
     args = parser.parse_args()
 
@@ -494,7 +511,7 @@ def main():
         sys.exit(1)
 
     demo = InteractiveLlamaStackDemo(args.llamastack_url, args.keycloak_url)
-    success = demo.run_demo(args.client_secret, skip_mcp=args.skip_mcp)
+    success = demo.run_demo(args.client_secret, skip_mcp=args.skip_mcp, team_only=args.team_only)
 
     sys.exit(0 if success else 1)
 
