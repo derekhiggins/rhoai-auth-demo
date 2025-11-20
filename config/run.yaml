@@ -103,14 +103,6 @@ providers:
         type: sqlite
         namespace: null
         db_path: /opt/app-root/src/.llama/distributions/rh/milvus_remote_registry.db
-  safety:
-    - provider_id: trustyai_fms
-      provider_type: remote::trustyai_fms
-      module: llama_stack_provider_trustyai_fms==0.2.2
-      config:
-        orchestrator_url: ${env.FMS_ORCHESTRATOR_URL:=}
-        ssl_cert_path: ${env.FMS_SSL_CERT_PATH:=}
-        shields: {}
   agents:
   - provider_id: meta-reference
     provider_type: inline::meta-reference
@@ -122,30 +114,6 @@ providers:
       responses_store:
         type: sqlite
         db_path: /opt/app-root/src/.llama/distributions/rh/responses_store.db
-  eval:
-  - provider_id: trustyai_lmeval
-    provider_type: remote::trustyai_lmeval
-    module: llama_stack_provider_lmeval==0.2.4
-    config:
-        use_k8s: ${env.TRUSTYAI_LMEVAL_USE_K8S:=true}
-        base_url: ${env.VLLM_URL:=http://localhost:8000/v1}
-  - provider_id: ${env.EMBEDDING_MODEL:+trustyai_ragas_inline}
-    provider_type: inline::trustyai_ragas
-    module: llama_stack_provider_ragas.inline
-    config:
-      embedding_model: ${env.EMBEDDING_MODEL:=}
-  - provider_id: ${env.KUBEFLOW_LLAMA_STACK_URL:+trustyai_ragas_remote}
-    provider_type: remote::trustyai_ragas
-    module: llama_stack_provider_ragas.remote
-    config:
-      embedding_model: ${env.EMBEDDING_MODEL:=}
-      kubeflow_config:
-        results_s3_prefix: ${env.KUBEFLOW_RESULTS_S3_PREFIX:=}
-        s3_credentials_secret_name: ${env.KUBEFLOW_S3_CREDENTIALS_SECRET_NAME:=}
-        pipelines_endpoint: ${env.KUBEFLOW_PIPELINES_ENDPOINT:=}
-        namespace: ${env.KUBEFLOW_NAMESPACE:=}
-        llama_stack_url: ${env.KUBEFLOW_LLAMA_STACK_URL:=}
-        base_image: ${env.KUBEFLOW_BASE_IMAGE:=}
   datasetio:
   - provider_id: huggingface
     provider_type: remote::huggingface
