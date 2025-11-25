@@ -132,7 +132,10 @@ class InteractiveLlamaStackDemo:
     def _handle_operation(self, operation: Callable, operation_name: str, success_msg: str = None) -> bool:
         """Common error handler for API operations"""
         try:
-            operation()
+            result = operation()
+            if hasattr(result, 'last_error') and result.last_error:
+                print(f"   ? {operation_name} error: {result.last_error}")
+                return False
             msg = success_msg or f"{operation_name}: Access granted"
             print(f"   o {msg}")
             return True
@@ -525,13 +528,15 @@ class InteractiveLlamaStackDemo:
         # Run file tests
         if 'files' in tests_to_run:
             file_results, test_file_id = self.test_file_operations()
-            # Cleanup: test file delete
-            file_delete_result = self.cleanup_test_file(test_file_id)
-            file_results['delete'] = file_delete_result
 
         # Run vector store tests
         if 'vectors' in tests_to_run:
             vector_results = self.test_vector_store_operations(user_roles, test_file_id)
+
+        if 'files' in tests_to_run:
+            # Cleanup: test file delete
+            file_delete_result = self.cleanup_test_file(test_file_id)
+            file_results['delete'] = file_delete_result
 
         # Run MCP tests
         if 'mcp' in tests_to_run:
