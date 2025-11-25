@@ -91,6 +91,36 @@ The demo showcases LlamaStack's multi-attribute access control, supporting:
    - `developer3` / `dev323` (role: developer, team: data-team - different team)
    - `user` / `user123` (role: user, team: data-team - vllm model only)
 
+   **Quick usage examples:**
+   ```bash
+   # Non-interactive with cached token
+   python scripts/interactive-demo.py --user developer --tests team
+
+   # Run specific test suites
+   python scripts/interactive-demo.py --user admin --tests models,files,vectors
+
+   # Force new authentication (bypass cache)
+   python scripts/interactive-demo.py --user developer --tests all --no-cache
+
+   # Run only team-based access tests
+   python scripts/interactive-demo.py --tests team
+   ```
+
+   **Token Caching:**
+   - Tokens are automatically cached in `~/.cache/llamastack-demo/` after first authentication
+   - When using `--user` with a valid cached token, no password prompt is shown
+   - Cached tokens are validated for expiry before reuse (60 second buffer)
+   - Use `--no-cache` to force fresh authentication
+
+   **Test Selection:**
+   - `--tests all` - Run all tests (default)
+   - `--tests models` - Only model access tests
+   - `--tests files` - Only file operations tests
+   - `--tests vectors` - Only vector store tests
+   - `--tests mcp` - Only MCP integration tests
+   - `--tests team` - Only team-based access tests
+   - Combine with commas: `--tests models,files,vectors`
+
    **Team-Based Access Demo**:
    - When logged in as `developer`, the demo creates a persistent vector store named `vs_mlteam_team` with a sample file attached
    - On every demo run (any user), the demo tests access to this vector store by:
@@ -163,8 +193,12 @@ Displays the client secret needed for authentication.
 Deploys the LlamaStack distribution to OpenShift. Creates ConfigMaps from the run configuration, deploys the LlamaStackDistribution resource, creates the route, and waits for the deployment to be ready.
 
 ### `interactive-demo.py`
-Interactive authentication demo that prompts for user credentials, obtains OAuth tokens from Keycloak, and tests access to various resources based on role and team permissions. Demonstrates:
+Interactive authentication demo that obtains OAuth tokens from Keycloak and tests access to various resources based on role and team permissions.
 
+**Features:**
+o **Flexible Test Selection**: Use `--tests` to run specific test suites (models, files, vectors, mcp, team)
+o **Token Caching**: Automatically caches and reuses valid tokens (stored in `~/.cache/llamastack-demo/`)
+o **Non-Interactive Mode**: Use `--user` to skip username prompt, and with cached token, no password prompt either
 o Model access across different providers (vLLM, OpenAI)
 o File operations (upload, list, delete)
 o Vector store operations (create, delete)
@@ -182,6 +216,17 @@ o **Team-based access control** (Vector Stores):
   - Demonstrates "user in owners teams" policy in action
   - Run with different users to see team-based isolation
 o Responses API with MCP server tools (demonstrates external tool integration)
+
+**Command-line options:**
+```
+--user USERNAME           Specify username (will prompt if not provided)
+--tests TEST_LIST         Comma-separated tests to run (default: all)
+--no-cache                Don't use cached tokens, always request new ones
+--cache-dir DIR           Custom directory for token cache
+--llamastack-url URL      LlamaStack server URL
+--keycloak-url URL        Keycloak base URL
+--client-secret SECRET    Keycloak client secret
+```
 
 All demonstrations use only the OpenAI Python client for API interactions.
 

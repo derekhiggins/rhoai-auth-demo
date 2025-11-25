@@ -6,7 +6,11 @@ Demonstrates RBAC with roles (user/developer/admin) and team-based access contro
 Uses the OpenAI Python client to test access to models, files, and vector stores.
 
 Usage:
-    python interactive-demo.py [--llamastack-url URL] [--keycloak-url URL] [--tests TEST_LIST]
+    python interactive-demo.py [--user USERNAME] [--tests TEST_LIST] [OPTIONS]
+
+Authentication:
+    --user USERNAME              Username for authentication (will prompt if not provided)
+    If a valid cached token exists for the user, no password prompt is shown.
 
 Test selection:
     --tests all                  Run all tests (default)
@@ -16,6 +20,11 @@ Test selection:
     --tests models,files,vectors Run multiple test suites
 
 Available tests: models, files, vectors, mcp, team
+
+Token caching:
+    By default, tokens are cached in ~/.cache/llamastack-demo/ and reused if still valid.
+    --no-cache                   Don't use cached tokens, always request new ones
+    --cache-dir DIR              Use custom directory for token cache
 """
 
 import os
@@ -28,18 +37,26 @@ import httpx
 from typing import Optional, Dict, Any, Callable
 import getpass
 import time
+from pathlib import Path
 from openai import OpenAI
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class InteractiveLlamaStackDemo:
-    def __init__(self, llamastack_url: str, keycloak_url: str):
+    def __init__(self, llamastack_url: str, keycloak_url: str, cache_dir: Optional[str] = None):
         self.llamastack_url = llamastack_url.rstrip('/')
         self.keycloak_url = keycloak_url.rstrip('/')
         self.realm = "llamastack-demo"
         self.client_id = "llamastack"
         self.token = None
         self.openai_client = None
+
+        # Token cache directory
+        if cache_dir:
+            self.cache_dir = Path(cache_dir)
+        else:
+            self.cache_dir = Path.home() / ".cache" / "llamastack-demo"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         self.models_to_test = [
             {"id": "vllm-inference/llama-3-2-3b", "name": "vLLM Llama 3.2 3B"},
@@ -48,12 +65,69 @@ class InteractiveLlamaStackDemo:
         ]
         self.embedding_model = "sentence-transformers/ibm-granite/granite-embedding-125m-english"
 
-    def get_user_credentials(self) -> tuple[str, str]:
-        """Prompt user for credentials"""
+    def get_username(self) -> str:
+        """Prompt user for username"""
         print("=" * 50)
         username = input("Username: ").strip()
+        return username
+
+    def get_password(self) -> str:
+        """Prompt user for password"""
         password = getpass.getpass("Password: ")
-        return username, password
+        return password
+
+    def get_token_cache_path(self, username: str) -> Path:
+        """Get the cache file path for a specific user's token"""
+        # Use a hash of the realm and keycloak URL to avoid conflicts
+        import hashlib
+        cache_key = hashlib.md5(f"{self.keycloak_url}:{self.realm}".encode()).hexdigest()[:8]
+        return self.cache_dir / f"token_{username}_{cache_key}.json"
+
+    def load_cached_token(self, username: str) -> Optional[str]:
+        """Load token from cache if it exists and is still valid"""
+        cache_file = self.get_token_cache_path(username)
+
+        if not cache_file.exists():
+            return None
+
+        try:
+            with open(cache_file, 'r') as f:
+                cache_data = json.load(f)
+
+            token = cache_data.get('access_token')
+            expires_at = cache_data.get('expires_at', 0)
+
+            # Check if token is still valid (with 60 second buffer)
+            if token and time.time() < (expires_at - 60):
+                # Verify token is actually valid by decoding it
+                claims = self.decode_token_claims(token)
+                if claims:
+                    print(f"? Using cached token (expires in {int(expires_at - time.time())}s)")
+                    return token
+            else:
+                print("? Cached token expired")
+        except Exception as e:
+            print(f"? Could not load cached token: {e}")
+
+        return None
+
+    def save_token_to_cache(self, username: str, token: str, expires_in: int):
+        """Save token to cache with expiration time"""
+        cache_file = self.get_token_cache_path(username)
+
+        try:
+            cache_data = {
+                'access_token': token,
+                'expires_at': time.time() + expires_in,
+                'cached_at': time.time()
+            }
+
+            with open(cache_file, 'w') as f:
+                json.dump(cache_data, f)
+
+            print(f"? Token cached for future use")
+        except Exception as e:
+            print(f"? Warning: Could not cache token: {e}")
 
     def _handle_operation(self, operation: Callable, operation_name: str, success_msg: str = None) -> bool:
         """Common error handler for API operations"""
@@ -88,8 +162,15 @@ class InteractiveLlamaStackDemo:
 
             if response.status_code == 200:
                 token_data = response.json()
+                access_token = token_data.get('access_token')
+                expires_in = token_data.get('expires_in', 300)
+
                 print("? Token obtained successfully")
-                return token_data.get('access_token')
+
+                # Cache the token
+                self.save_token_to_cache(username, access_token, expires_in)
+
+                return access_token
             else:
                 print(f"? Failed to get token: HTTP {response.status_code}")
                 print(f"   {response.text}")
@@ -379,20 +460,31 @@ class InteractiveLlamaStackDemo:
         return results
 
 
-    def run_demo(self, client_secret: str, tests_to_run: set) -> bool:
+    def run_demo(self, client_secret: str, tests_to_run: set, use_cache: bool = True, username: Optional[str] = None) -> bool:
         """Run the interactive demo"""
         print("=" * 50)
         print(f"LlamaStack URL: {self.llamastack_url}")
         print(f"Keycloak URL: {self.keycloak_url}")
         print(f"Realm: {self.realm}")
 
-        # Get credentials
-        username, password = self.get_user_credentials()
+        # Get username from parameter or prompt
+        if not username:
+            username = self.get_username()
+        else:
+            print("=" * 50)
+            print(f"Username: {username}")
 
-        # Get token
-        self.token = self.get_token(username, password, client_secret)
+        # Try to load cached token first
+        if use_cache:
+            self.token = self.load_cached_token(username)
+
+        # Get new token if cache miss or cache disabled
         if not self.token:
-            return False
+            # Only ask for password if we need to authenticate
+            password = self.get_password()
+            self.token = self.get_token(username, password, client_secret)
+            if not self.token:
+                return False
 
         # Initialize OpenAI client
         self.initialize_openai_client()
@@ -507,9 +599,18 @@ def main():
     parser.add_argument("--client-secret",
                        default=os.getenv("KEYCLOAK_CLIENT_SECRET"),
                        help="Keycloak client secret")
+    parser.add_argument("--user",
+                       default=None,
+                       help="Username for authentication (will prompt if not provided)")
     parser.add_argument("--tests",
                        default="all",
                        help="Comma-separated list of tests to run: models,files,vectors,mcp,team (default: all)")
+    parser.add_argument("--no-cache",
+                       action="store_true",
+                       help="Don't use cached tokens, always request new ones")
+    parser.add_argument("--cache-dir",
+                       default=None,
+                       help="Directory to store cached tokens (default: ~/.cache/llamastack-demo)")
 
     args = parser.parse_args()
 
@@ -531,8 +632,8 @@ def main():
             sys.exit(1)
         tests_to_run = requested_tests
 
-    demo = InteractiveLlamaStackDemo(args.llamastack_url, args.keycloak_url)
-    success = demo.run_demo(args.client_secret, tests_to_run)
+    demo = InteractiveLlamaStackDemo(args.llamastack_url, args.keycloak_url, cache_dir=args.cache_dir)
+    success = demo.run_demo(args.client_secret, tests_to_run, use_cache=not args.no_cache, username=args.user)
 
     sys.exit(0 if success else 1)
 
