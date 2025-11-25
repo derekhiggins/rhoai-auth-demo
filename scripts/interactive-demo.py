@@ -6,7 +6,16 @@ Demonstrates RBAC with roles (user/developer/admin) and team-based access contro
 Uses the OpenAI Python client to test access to models, files, and vector stores.
 
 Usage:
-    python interactive-demo.py [--llamastack-url URL] [--keycloak-url URL]
+    python interactive-demo.py [--llamastack-url URL] [--keycloak-url URL] [--tests TEST_LIST]
+
+Test selection:
+    --tests all                  Run all tests (default)
+    --tests models               Run only model access tests
+    --tests team                 Run only team-based access tests
+    --tests models,files         Run models and files tests
+    --tests models,files,vectors Run multiple test suites
+
+Available tests: models, files, vectors, mcp, team
 """
 
 import os
@@ -370,7 +379,7 @@ class InteractiveLlamaStackDemo:
         return results
 
 
-    def run_demo(self, client_secret: str, skip_mcp: bool = False, team_only: bool = False) -> bool:
+    def run_demo(self, client_secret: str, tests_to_run: set) -> bool:
         """Run the interactive demo"""
         print("=" * 50)
         print(f"LlamaStack URL: {self.llamastack_url}")
@@ -402,44 +411,46 @@ class InteractiveLlamaStackDemo:
             print(f"   Expires: {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(claims.get('exp', 0)))}")
 
         print("\n" + "=" * 50)
-        if team_only:
-            print("TEAM-BASED ACCESS CONTROL TEST")
-        else:
-            print("ROLE-BASED ACCESS CONTROL TEST")
+        print(f"ACCESS CONTROL TEST - Running: {', '.join(sorted(tests_to_run))}")
         print("=" * 50)
 
-        if team_only:
-            # Only run team tests
-            model_results = []
-            file_results = {}
-            vector_results = {}
-            mcp_results = {}
-            test_file_id = None
-        else:
+        # Initialize results
+        model_results = []
+        file_results = {}
+        vector_results = {}
+        mcp_results = {}
+        team_create_results = {}
+        team_access_results = {}
+        test_file_id = None
+
+        # Run models tests
+        if 'models' in tests_to_run:
             # List models
             self.list_models()
-
             # Test all models
             model_results = self.test_models()
 
-            # Test file operations
+        # Run file tests
+        if 'files' in tests_to_run:
             file_results, test_file_id = self.test_file_operations()
-
-            # Test vector store operations (with file if available)
-            vector_results = self.test_vector_store_operations(user_roles, test_file_id)
-
-            # Test responses API with MCP tools
-            mcp_results = {} if skip_mcp else self.test_responses_with_mcp()
-
             # Cleanup: test file delete
             file_delete_result = self.cleanup_test_file(test_file_id)
             file_results['delete'] = file_delete_result
 
-        # Create persistent team vector store (only for 'developer' user)
-        team_create_results = self.create_team_vector_store(username)
+        # Run vector store tests
+        if 'vectors' in tests_to_run:
+            vector_results = self.test_vector_store_operations(user_roles, test_file_id)
 
-        # Test access to team vector store (all users)
-        team_access_results = self.test_access_to_team_vector_store(username, user_teams)
+        # Run MCP tests
+        if 'mcp' in tests_to_run:
+            mcp_results = self.test_responses_with_mcp()
+
+        # Run team tests
+        if 'team' in tests_to_run:
+            # Create persistent team vector store (only for 'developer' user)
+            team_create_results = self.create_team_vector_store(username)
+            # Test access to team vector store (all users)
+            team_access_results = self.test_access_to_team_vector_store(username, user_teams)
 
         # Print summary
         self.print_summary(user_roles, user_teams, model_results, file_results, vector_results, mcp_results, team_create_results, team_access_results)
@@ -496,12 +507,9 @@ def main():
     parser.add_argument("--client-secret",
                        default=os.getenv("KEYCLOAK_CLIENT_SECRET"),
                        help="Keycloak client secret")
-    parser.add_argument("--skip-mcp",
-                       action="store_true",
-                       help="Skip MCP test")
-    parser.add_argument("--team-only",
-                       action="store_true",
-                       help="Only run team-based access tests")
+    parser.add_argument("--tests",
+                       default="all",
+                       help="Comma-separated list of tests to run: models,files,vectors,mcp,team (default: all)")
 
     args = parser.parse_args()
 
@@ -510,8 +518,21 @@ def main():
         print("   Set KEYCLOAK_CLIENT_SECRET environment variable or use --client-secret")
         sys.exit(1)
 
+    # Parse tests to run
+    available_tests = {'models', 'files', 'vectors', 'mcp', 'team'}
+    if args.tests.lower() == 'all':
+        tests_to_run = available_tests
+    else:
+        requested_tests = {t.strip().lower() for t in args.tests.split(',')}
+        invalid_tests = requested_tests - available_tests
+        if invalid_tests:
+            print(f"? Invalid test names: {', '.join(invalid_tests)}")
+            print(f"   Available tests: {', '.join(sorted(available_tests))}")
+            sys.exit(1)
+        tests_to_run = requested_tests
+
     demo = InteractiveLlamaStackDemo(args.llamastack_url, args.keycloak_url)
-    success = demo.run_demo(args.client_secret, skip_mcp=args.skip_mcp, team_only=args.team_only)
+    success = demo.run_demo(args.client_secret, tests_to_run)
 
     sys.exit(0 if success else 1)
 
