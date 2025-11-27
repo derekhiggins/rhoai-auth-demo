@@ -133,6 +133,7 @@ class InteractiveLlamaStackDemo:
         """Common error handler for API operations"""
         try:
             result = operation()
+            print(f"   ? {operation_name} result: {result}")
             if hasattr(result, 'last_error') and result.last_error:
                 print(f"   ? {operation_name} error: {result.last_error}")
                 return False
