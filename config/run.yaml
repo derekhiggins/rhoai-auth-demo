@@ -256,7 +256,6 @@ server:
         when: user with admin in roles
         description: Admins have full access to all resources
 
-      # TEAM-BASED ACCESS EXAMPLES:
       # The following rules demonstrate explicit team-based access control
       - permit:
           actions: [read, delete]
@@ -264,8 +263,15 @@ server:
         when: user in owners teams
         description: Teams can access their own vector stores
 
+      # The following rules demonstrate allowing a user to read and delete their own resources
       - permit:
           actions: [read, delete]
           resource: vector_store::*
         when: user is owner
         description: Owners can access their own vector stores
+
+      - permit:
+          actions: [read, delete]
+          resource: sql_record::openai_files::*
+        when: user is owner
+        description: Owners can access their own Files
