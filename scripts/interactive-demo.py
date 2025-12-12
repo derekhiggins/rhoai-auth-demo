@@ -442,10 +442,12 @@ class InteractiveLlamaStackDemo:
         print("\n   Testing responses with MCP tools...")
         print("=" * 50)
 
-        results = {'responses_with_mcp': False}
+        results = {'responses_with_mcp': False, 'list_responses': False, 'continue_response': False}
+        first_response_obj = None
 
         def call_mcp():
-            response = self.openai_client.responses.create(
+            nonlocal first_response_obj
+            first_response_obj = self.openai_client.responses.create(
                 model="vllm-inference/llama-3-2-3b",
                 tools=[{
                     "type": "mcp",
@@ -456,11 +458,82 @@ class InteractiveLlamaStackDemo:
                 }],
                 input="What version of python is used in the llamastack/llama-stack project, be brief and to the point? Make sure to use the deepwiki ask_question tool to answer the question.",
                 stream=False,
+                store=True
             )
-            if hasattr(response, 'output_text') and response.output_text:
-                print(f"      Response: {response.output_text[:100]}...")
+            if hasattr(first_response_obj, 'output_text') and first_response_obj.output_text:
+                print(f"      Response: {first_response_obj.output_text[:100]}...")
 
         results['responses_with_mcp'] = self._handle_operation(call_mcp, "Responses with MCP Tools")
+
+        # List all responses using direct HTTP call
+        print("\n   Listing all responses...")
+        print("=" * 50)
+
+        try:
+            response = requests.get(
+                f"{self.llamastack_url}/v1/responses",
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": "application/json"
+                },
+                verify=False,
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                responses_data = response.json()
+                results['list_responses'] = True
+
+                # Handle both list and object with data field
+                if isinstance(responses_data, list):
+                    responses_list = responses_data
+                elif isinstance(responses_data, dict) and 'data' in responses_data:
+                    responses_list = responses_data['data']
+                else:
+                    responses_list = []
+
+                if responses_list:
+                    print(f"   o Successfully listed {len(responses_list)} response(s)")
+
+                    for idx, resp in enumerate(responses_list):
+                        response_id = resp.get('id', 'unknown')
+                        print(f"      {idx + 1}. Response ID: {response_id}")
+
+                    # Continue the first response found using previous_response_id
+                    first_response_id = responses_list[0].get('id')
+                    if first_response_id:
+                        print(f"\n   Continuing first response (ID: {first_response_id}) with summary request...")
+                        print("=" * 50)
+
+                        try:
+                            continued_response = self.openai_client.responses.create(
+                                model="vllm-inference/llama-3-2-3b",
+                                input="Provide a 1-line summary of this conversation.",
+                                previous_response_id=first_response_id,
+                                stream=False,
+                                store=True
+                            )
+                            results['continue_response'] = True
+
+                            if hasattr(continued_response, 'output_text') and continued_response.output_text:
+                                print(f"   o Summary: {continued_response.output_text}")
+                            else:
+                                print(f"   o Summary generated successfully")
+
+                        except Exception as e:
+                            print(f"   o Error continuing response: {e}")
+                            results['continue_response'] = False
+                else:
+                    print(f"   o No responses found to continue")
+            else:
+                print(f"   o Error listing responses: HTTP {response.status_code}")
+                print(f"      {response.text}")
+                results['list_responses'] = False
+
+        except Exception as e:
+            print(f"   o Error listing responses: {e}")
+            results['list_responses'] = False
+
         return results
 
 
