@@ -12,6 +12,8 @@ The demo features user personas with different access levels based on both roles
 - **Developer2** (ml-team): Same as developer - demonstrates team-based access
 - **Developer3** (data-team): Same role as developer but DIFFERENT team - cannot access ml-team resources
 - **User** (data-team): Read-only access to on-site models (vLLM, embedding models)
+- **User2** (no role, no team)
+- **User3** (no role, no team)
 
 The demo showcases LlamaStack's multi-attribute access control, supporting:
 - **Roles**: Traditional role-based access control (admin, developer, user)
@@ -90,6 +92,8 @@ The demo showcases LlamaStack's multi-attribute access control, supporting:
    - `developer2` / `dev223` (role: developer, team: ml-team - same as developer)
    - `developer3` / `dev323` (role: developer, team: data-team - different team)
    - `user` / `user123` (role: user, team: data-team - vllm model only)
+   - `user2` / `user123` (no role, no team)
+   - `user3` / `user123` (no role, no team)
 
    **Quick usage examples:**
    ```bash

@@ -359,6 +359,28 @@ class KeycloakSetup:
                 "credentials": [{"type": "password", "value": "user123", "temporary": False}],
                 "roles": ["user"],
                 "teams": ["data-team"]
+            },
+            {
+                "username": "user2",
+                "email": "user2@example.com",
+                "firstName": "User",
+                "lastName": "One",
+                "enabled": True,
+                "emailVerified": True,
+                "credentials": [{"type": "password", "value": "user123", "temporary": False}],
+                "roles": [],
+                "teams": []
+            },
+            {
+                "username": "user3",
+                "email": "user3@example.com",
+                "firstName": "User",
+                "lastName": "Two",
+                "enabled": True,
+                "emailVerified": True,
+                "credentials": [{"type": "password", "value": "user123", "temporary": False}],
+                "roles": [],
+                "teams": []
             }
         ]
 
@@ -475,6 +497,8 @@ class KeycloakSetup:
                 print(f"   developer2 / dev223 (role: developer, team: ml-team)")
                 print(f"   developer3 / dev323 (role: developer, team: data-team)")
                 print(f"   user / user123 (role: user, team: data-team)")
+                print(f"   user2 / user123 (no role, no team)")
+                print(f"   user3 / user123 (no role, no team)")
 
             print("\n✅ Keycloak setup completed successfully!")
             return True
