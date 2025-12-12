@@ -61,8 +61,8 @@ class KeycloakSetup:
             "realm": self.realm_name,
             "enabled": True,
             "displayName": "LlamaStack Demo Realm",
-            "accessTokenLifespan": 3600,
-            "ssoSessionMaxLifespan": 36000,
+            "accessTokenLifespan": 43200,
+            "ssoSessionMaxLifespan": 43200,
             "registrationAllowed": False,
             "loginWithEmailAllowed": True,
             "duplicateEmailsAllowed": False
@@ -100,7 +100,7 @@ class KeycloakSetup:
             "webOrigins": ["*"],
             "protocol": "openid-connect",
             "attributes": {
-                "access.token.lifespan": "3600"
+                "access.token.lifespan": "43200"
             }
         }
 
