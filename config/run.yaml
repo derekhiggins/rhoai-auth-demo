@@ -252,7 +252,7 @@ server:
 
       # Admin role: full access to everything
       - permit:
-          actions: [create, read, delete]
+          actions: [create, read, update, delete]
         when: user with admin in roles
         description: Admins have full access to all resources
 
