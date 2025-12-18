@@ -192,6 +192,11 @@ registered_resources:
     provider_id: tavily-search
   - toolgroup_id: builtin::rag
     provider_id: rag-runtime
+vector_stores:
+  default_provider_id: milvus
+  default_embedding_model:
+    provider_id: sentence-transformers
+    model_id: ibm-granite/granite-embedding-125m-english
 server:
   port: 8321
   auth:
