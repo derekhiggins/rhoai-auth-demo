@@ -54,10 +54,9 @@ class RAGTest:
         self.client = None
         
         self.sample_docs = [
-            "LlamaStack is a comprehensive framework for building AI applications with large language models.",
-            "Red Hat OpenShift AI provides a platform for data scientists to develop and deploy machine learning models.",
-            "Vector databases enable efficient similarity search over high-dimensional embeddings.",
-            "Retrieval Augmented Generation (RAG) combines information retrieval with language generation.",
+            "Our secret name is Paul French.",
+            "Our favorite HEX color is #cf3a24.",
+            "Our favorite planet name is Gaia."
         ]
 
     def initialize_clients(self):
@@ -74,17 +73,18 @@ class RAGTest:
         )
 
     def create_vector_store(self) -> Optional[str]:
-        """Create a vector store"""
+        """Create a vector store""" 
+        
         print("\n[1/3] Creating vector store...")
         
         try:
             response = self.client.vector_stores.create(
                 name=f"rag-test-{uuid.uuid4().hex[:8]}",
-                metadata={
+                extra_body={
                     "embedding_model": self.embedding_model,
                     "embedding_dimension": self.embedding_dimension,
                     "provider_id": self.vector_store_provider
-                }
+                } 
             )
             print(f"      Created: {response.id}")
             return response.id
@@ -179,8 +179,9 @@ class RAGTest:
         
         print("\n[3/3] Testing RAG queries...")
         queries = [
-            "What is LlamaStack?",
-            "Tell me about vector databases"
+            "What is our secret name? In one short sentence.",
+            "What is our favorite HEX color? In one short sentence.",
+            "What is our favorite planet name? In one short sentence.",
         ]
         
         for i, query in enumerate(queries, 1):
@@ -188,7 +189,12 @@ class RAGTest:
             answer = self.query_rag(vector_store_id, query)
             if answer:
                 print(f"   Answer: {answer}")
+                ## asseet that the answer is in the sample_docs
+                print(f"Answer: {answer}")
+                print(f"Sample docs: {self.sample_docs}")
+                assert answer in self.sample_docs, f"Answer {answer} is not in the sample docs"
         
+        print(f"Answer: {answer}")
         print("\n" + "=" * 60)
         print("RAG test completed successfully")
         print("=" * 60)
@@ -208,13 +214,13 @@ def main():
     
     parser.add_argument(
         "--inference-model",
-        default=os.getenv("INFERENCE_MODEL", "llama-3-2-3b"),
+        default=os.getenv("INFERENCE_MODEL", "vllm-inference/llama-3-2-3b"),
         help="Inference model for RAG (env: INFERENCE_MODEL)"
     )
     
     parser.add_argument(
         "--embedding-model",
-        default=os.getenv("EMBEDDING_MODEL", "granite-embedding-125m"),
+        default=os.getenv("EMBEDDING_MODEL", "sentence-transformers/nomic-ai/nomic-embed-text-v1.5"),
         help="Embedding model for vector store (env: EMBEDDING_MODEL)"
     )
     
