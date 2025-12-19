@@ -121,9 +121,10 @@ The demo showcases LlamaStack's multi-attribute access control, supporting:
    - `--tests models` - Only model access tests
    - `--tests files` - Only file operations tests
    - `--tests vectors` - Only vector store tests
+   - `--tests datasets` - Only dataset operations tests
    - `--tests mcp` - Only MCP integration tests
    - `--tests team` - Only team-based access tests
-   - Combine with commas: `--tests models,files,vectors`
+   - Combine with commas: `--tests models,files,vectors,datasets`
 
    **Team-Based Access Demo**:
    - When logged in as `developer`, the demo creates a persistent vector store named `vs_mlteam_team` with a sample file attached
@@ -169,16 +170,19 @@ The vector store access pattern showcases this hybrid approach:
 | Files                  | -       | Full (CRD)     | Full (CRD)  | Role-based |
 | Vector Stores          | -       | Create only    | Full (CRD)  | **Team-based R/D** |
 | Vector Store Files     | -       | Team-based     | Full (CRD)  | **Team-based** |
+| Datasets               | -       | Create only    | Full (CRD)  | Owner can R/U/D |
 | MCP Servers            | Read    | Read           | Full (CRD)  | Role-based |
 | SQL Records            | -       | Read           | Full (CRD)  | Role-based |
 
-**Legend:** CRD = Create, Read, Delete
+**Legend:** CRD = Create, Read, Delete; R/U/D = Read, Update, Delete
 
-**Key Access Control Pattern:**
+**Key Access Control Patterns:**
 - **Vector Stores**: Developers can CREATE vector stores. Reading and deleting is controlled by the `user in owners teams` policy
   - Example: developer (ml-team) creates `vs_mlteam_team` → developer2 (ml-team) can read/delete it
   - Example: developer3 (data-team) CANNOT read/delete `vs_mlteam_team` (different team)
-- This demonstrates how team-based access control works alongside role-based permissions
+- **Datasets**: Developers can CREATE datasets. Reading, updating, and deleting is controlled by owner-based access
+  - Demonstrates owner-based access control for evaluation datasets
+- This demonstrates how team-based and owner-based access control works alongside role-based permissions
 
 ## Scripts
 
@@ -200,13 +204,14 @@ Deploys the LlamaStack distribution to OpenShift. Creates ConfigMaps from the ru
 Interactive authentication demo that obtains OAuth tokens from Keycloak and tests access to various resources based on role and team permissions.
 
 **Features:**
-o **Flexible Test Selection**: Use `--tests` to run specific test suites (models, files, vectors, mcp, team)
+o **Flexible Test Selection**: Use `--tests` to run specific test suites (models, files, vectors, datasets, mcp, team)
 o **Token Caching**: Automatically caches and reuses valid tokens (stored in `~/.cache/llamastack-demo/`)
 o **Non-Interactive Mode**: Use `--user` to skip username prompt, and with cached token, no password prompt either
 o Model access across different providers (vLLM, OpenAI)
 o File operations (upload, list, delete)
 o Vector store operations (create, delete)
 o Vector store file attachments (end-to-end workflow)
+o Dataset operations (create, list, get, append rows, iterate rows, delete)
 o **Team-based access control** (Vector Stores):
   - Access model: CREATE (role-based) + READ/DELETE (team-based via "user in owners teams")
   - When logged in as `developer`: Creates persistent vector store `vs_mlteam_team` (ml-team owned) with a sample file
@@ -232,7 +237,7 @@ o Responses API with MCP server tools (demonstrates external tool integration)
 --client-secret SECRET    Keycloak client secret
 ```
 
-All demonstrations use only the OpenAI Python client for API interactions.
+Standard OpenAI-compatible APIs (models, files, vector stores) use the OpenAI Python client. LlamaStack-specific extensions (datasets, datasetio) use direct HTTP calls with the same OAuth token.
 
 ## MCP Server Integration
 

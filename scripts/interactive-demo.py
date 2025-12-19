@@ -19,7 +19,7 @@ Test selection:
     --tests models,files         Run models and files tests
     --tests models,files,vectors Run multiple test suites
 
-Available tests: models, files, vectors, mcp, team
+Available tests: models, files, vectors, datasets, mcp, team
 
 Token caching:
     By default, tokens are cached in ~/.cache/llamastack-demo/ and reused if still valid.
@@ -437,6 +437,117 @@ class InteractiveLlamaStackDemo:
                 print(f"   o Error listing stores: {e}")
                 return results
 
+    def _dataset_api_call(self, method: str, endpoint: str, operation_name: str, json_data: dict = None) -> tuple[bool, Any]:
+        """Helper for dataset API calls"""
+        import urllib.parse
+        try:
+            url = f"{self.llamastack_url}/v1beta/{endpoint}"
+            response = requests.request(
+                method=method,
+                url=url,
+                headers={
+                    "Authorization": f"Bearer {self.token}",
+                    "Content-Type": "application/json"
+                },
+                json=json_data,
+                verify=False,
+                timeout=10
+            )
+
+            if response.status_code in [200, 201, 204]:
+                print(f"   o {operation_name}: Access granted")
+                return True, response.json() if response.content else None
+            else:
+                status = "Access denied (403)" if response.status_code == 403 else f"Error (HTTP {response.status_code})"
+                print(f"   o {operation_name}: {status}")
+                return False, None
+
+        except Exception as e:
+            error_str = str(e)
+            if "403" in error_str or "Forbidden" in error_str:
+                print(f"   o {operation_name}: Access denied (403)")
+            else:
+                print(f"   o {operation_name}: Error - {e}")
+            return False, None
+
+    def test_dataset_operations(self) -> tuple[dict, Optional[str]]:
+        """Test dataset operations"""
+        print("\n   Testing dataset operations...")
+        print("=" * 50)
+
+        results = {'create': False, 'list': False, 'get': False, 'append_rows': False, 'get_rows': False}
+        dataset_id = None
+
+        # Test CREATE
+        success, data = self._dataset_api_call(
+            'POST', 'datasets', 'Dataset Create',
+            json_data={
+                "dataset_id": f"demo-dataset-{int(time.time())}",
+                "purpose": "eval/question-answer",
+                "source": {
+                    "type": "rows",
+                    "rows": [
+                        {"input": "What is 2+2?", "expected": "4", "generated": "4"},
+                        {"input": "What is 3+3?", "expected": "6", "generated": "6"}
+                    ]
+                },
+                "metadata": {"provider_id": "localfs", "description": "Demo dataset"}
+            }
+        )
+        results['create'] = success
+        if success and data:
+            dataset_id = data.get('identifier') or data.get('dataset_id')
+            print(f"      ID: {dataset_id}")
+
+        # Test LIST
+        success, data = self._dataset_api_call('GET', 'datasets', 'Dataset List')
+        results['list'] = success
+        if success and data:
+            datasets_list = data if isinstance(data, list) else data.get('data', [])
+            print(f"      Found {len(datasets_list)} dataset(s)")
+            if not dataset_id and datasets_list:
+                dataset_id = datasets_list[0].get('dataset_id') or datasets_list[0].get('id')
+
+        if not dataset_id:
+            print(f"   o Dataset Get/Append/Get Rows: Skipped (no dataset available)")
+            return results, None
+
+        # Test GET
+        import urllib.parse
+        encoded_id = urllib.parse.quote(dataset_id, safe='')
+        results['get'], _ = self._dataset_api_call('GET', f'datasets/{encoded_id}', 'Dataset Get')
+
+        # Test APPEND ROWS
+        results['append_rows'], _ = self._dataset_api_call(
+            'POST', f'datasetio/append-rows/{encoded_id}', 'Dataset Append Rows',
+            json_data={"rows": [{"input": "test", "expected": "test", "generated": f"test-{int(time.time())}"}]}
+        )
+
+        # Test GET ROWS (iterate)
+        success, data = self._dataset_api_call('GET', f'datasetio/iterrows/{encoded_id}', 'Dataset Get Rows')
+        results['get_rows'] = success
+        if success and data:
+            rows = data.get('data', []) if isinstance(data, dict) else data
+            print(f"      Retrieved {len(rows)} row(s)")
+            for idx, row in enumerate(rows[:3], 1):
+                print(f"         {idx}. input={row.get('input', 'N/A')[:30]}, expected={row.get('expected', 'N/A')[:20]}")
+
+        return results, dataset_id
+
+    def cleanup_test_dataset(self, dataset_id: Optional[str]) -> bool:
+        """Test dataset delete operation"""
+        print("\n   Testing dataset cleanup...")
+        print("=" * 50)
+
+        if not dataset_id:
+            print(f"   o Dataset Delete: Skipped (no dataset to delete)")
+            return False
+
+        import urllib.parse
+        encoded_id = urllib.parse.quote(dataset_id, safe='')
+        success, _ = self._dataset_api_call('DELETE', f'datasets/{encoded_id}', 'Dataset Delete')
+        return success
+
     def test_responses_with_mcp(self) -> dict:
         """Test responses API with MCP server tools"""
         print("\n   Testing responses with MCP tools...")
@@ -587,10 +698,12 @@ class InteractiveLlamaStackDemo:
         model_results = []
         file_results = {}
         vector_results = {}
+        dataset_results = {}
         mcp_results = {}
         team_create_results = {}
         team_access_results = {}
         test_file_id = None
+        test_dataset_id = None
 
         # Run models tests
         if 'models' in tests_to_run:
@@ -612,6 +725,12 @@ class InteractiveLlamaStackDemo:
             file_delete_result = self.cleanup_test_file(test_file_id)
             file_results['delete'] = file_delete_result
 
+        # Run dataset tests
+        if 'datasets' in tests_to_run:
+            dataset_results, test_dataset_id = self.test_dataset_operations()
+            dataset_delete_result = self.cleanup_test_dataset(test_dataset_id)
+            dataset_results['delete'] = dataset_delete_result
+
         # Run MCP tests
         if 'mcp' in tests_to_run:
             mcp_results = self.test_responses_with_mcp()
@@ -624,11 +743,11 @@ class InteractiveLlamaStackDemo:
             team_access_results = self.test_access_to_team_vector_store(username, user_teams)
 
         # Print summary
-        self.print_summary(user_roles, user_teams, model_results, file_results, vector_results, mcp_results, team_create_results, team_access_results)
+        self.print_summary(user_roles, user_teams, model_results, file_results, vector_results, dataset_results, mcp_results, team_create_results, team_access_results)
 
         return True
 
-    def print_summary(self, user_roles: list, user_teams: list, model_results: list, file_results: dict, vector_results: dict, mcp_results: dict, team_create_results: dict, team_access_results: dict):
+    def print_summary(self, user_roles: list, user_teams: list, model_results: list, file_results: dict, vector_results: dict, dataset_results: dict, mcp_results: dict, team_create_results: dict, team_access_results: dict):
         """Print access control summary"""
         print("\n" + "=" * 50)
         print("ACCESS SUMMARY")
@@ -652,6 +771,8 @@ class InteractiveLlamaStackDemo:
             print_results("File Operations", file_results)
         if vector_results:
             print_results("Vector Store Operations", vector_results)
+        if dataset_results:
+            print_results("Dataset Operations", dataset_results)
 
         print(f"\nTeam-Based Vector Store (vs_mlteam_team):")
         if team_create_results.get('created'):
@@ -683,7 +804,7 @@ def main():
                        help="Username for authentication (will prompt if not provided)")
     parser.add_argument("--tests",
                        default="all",
-                       help="Comma-separated list of tests to run: models,files,vectors,mcp,team (default: all)")
+                       help="Comma-separated list of tests to run: models,files,vectors,datasets,mcp,team (default: all)")
     parser.add_argument("--no-cache",
                        action="store_true",
                        help="Don't use cached tokens, always request new ones")
@@ -699,7 +820,7 @@ def main():
         sys.exit(1)
 
     # Parse tests to run
-    available_tests = {'models', 'files', 'vectors', 'mcp', 'team'}
+    available_tests = {'models', 'files', 'vectors', 'datasets', 'mcp', 'team'}
     if args.tests.lower() == 'all':
         tests_to_run = available_tests
     else:
