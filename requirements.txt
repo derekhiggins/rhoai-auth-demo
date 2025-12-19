@@ -1,0 +1,5 @@
+urllib3
+httpx
+openai
+llama-stack-client
+

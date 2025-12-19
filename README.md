@@ -15,6 +15,7 @@ The demo features three user personas with different access levels:
 - LlamaStack operator deployed
 - Keycloak instance running and accessible
 - `oc` CLI tool configured and authenticated
+- Python 3.x with virtual environment support (for running test scripts)
 
 ## Quick Start
 
@@ -23,6 +24,13 @@ The demo features three user personas with different access levels:
    cp vars.env.example vars.env
    vi vars.env  # Add your OpenAI API key and other settings
    source ./vars.env
+   ```
+
+   **Setup Python Environment** (for running test scripts):
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate  # On fish shell: source venv/bin/activate.fish
+   pip install -r requirements.txt
    ```
 
 2. **Deploy Keycloak** (if not already deployed):
@@ -71,6 +79,13 @@ The demo features three user personas with different access levels:
    python scripts/interactive-demo.py
    ```
 
+   RAG test (requires vector store provider configured):
+   ```bash
+   source vars.env  # Load environment variables
+   source venv/bin/activate  # Activate virtual environment if not already active
+   python scripts/rag-test.py
+   ```
+
    Demo users (configured by setup-keycloak.py):
    - `admin-user` / `admin123` (admin role - full access to all models)
    - `datascience-user` / `ds123` (datascience role - vllm and gpt-4o-mini)
@@ -100,6 +115,33 @@ Deploys the LlamaStack distribution to OpenShift. Creates ConfigMaps from the ru
 
 ### `interactive-demo.py`
 Interactive authentication demo that prompts for user credentials, obtains OAuth tokens from Keycloak, and tests access to various models based on role permissions. Shows which models each user role can access.
+
+### `rag-test.py`
+RAG (Retrieval Augmented Generation) test script that validates LlamaStack's vector store and RAG functionality. The script creates a vector store, inserts sample documents, and performs RAG queries to verify end-to-end RAG capabilities.
+
+**Usage:**
+```bash
+source vars.env  # Load environment variables
+python scripts/rag-test.py [options]
+```
+
+**Options:**
+- `--llamastack-url URL` - LlamaStack server URL (default: `http://localhost:8321`, env: `LLAMASTACK_URL`)
+- `--inference-model MODEL` - Inference model for RAG generation (default: `vllm-inference/llama-3-2-3b`, env: `INFERENCE_MODEL`)
+- `--embedding-model MODEL` - Embedding model for vector store (default: `sentence-transformers/nomic-ai/nomic-embed-text-v1.5`, env: `EMBEDDING_MODEL`)
+- `--embedding-dimension DIM` - Dimension of embedding vectors (default: `768`, env: `EMBEDDING_DIMENSION`)
+- `--vector-store-provider PROVIDER` - Vector store provider (default: `milvus`, env: `VECTOR_STORE_PROVIDER`)
+
+**What it does:**
+1. Creates a vector store with the specified embedding model and provider
+2. Inserts sample documents into the vector store
+3. Performs RAG queries to retrieve relevant context and generate answers
+4. Validates that the RAG pipeline returns expected results
+
+**Prerequisites:**
+- Python virtual environment with dependencies installed (see `requirements.txt`)
+- LlamaStack server running and accessible
+- Vector store provider (e.g., Milvus) configured and available
 
 ## Development Notes
 
