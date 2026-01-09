@@ -1,6 +1,13 @@
 # Environment files with secrets
 vars.env
+vars.env.local
+vars.env.remote
 token-*
 
 # Virtual environments
 venv/
+
+# other
+__pycache__
+old/
+patches/
