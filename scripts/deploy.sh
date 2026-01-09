@@ -30,10 +30,10 @@ if [ "$CURRENT_PROJECT" != "$OPENSHIFT_NAMESPACE" ]; then
 fi
 
 # Deploy ConfigMap from config file
-echo "📦 Creating ConfigMap from config/run.yaml..."
+echo "📦 Creating ConfigMap from config/config.yaml..."
 F=$(mktemp)
-cat config/run.yaml | envsubst > $F
-oc create configmap "${LLAMASTACK_DISTRIBUTION_NAME:-llamastack-auth-demo}-config" --from-file=run.yaml=$F -n "$OPENSHIFT_NAMESPACE" --dry-run=client -o yaml | oc apply -f -
+cat config/config.yaml | envsubst > $F
+oc create configmap "${LLAMASTACK_DISTRIBUTION_NAME:-llamastack-auth-demo}-config" --from-file=config.yaml=$F -n "$OPENSHIFT_NAMESPACE" --dry-run=client -o yaml | oc apply -f -
 rm $F
 
 # Deploy LlamaStack Distribution
